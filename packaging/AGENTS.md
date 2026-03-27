@@ -8,6 +8,8 @@
 
 `packaging/desktop/` holds the current Electron desktop host.
 
+`packaging/package.json` holds packaging-only dependencies so the root install can stay lean.
+
 `packaging/scripts/` holds packaging entrypoints and shared build helpers.
 
 `packaging/resources/` holds shared packaging resources.

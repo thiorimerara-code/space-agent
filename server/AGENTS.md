@@ -18,6 +18,7 @@ It should not become the primary application runtime.
 
 - `app.js`: server factory
 - `server.js`: server startup entry
+- `dev-server.js`: source-checkout dev supervisor that restarts `serve` on server-side changes
 - `api/`: simple endpoint modules loaded by name
 - `api-registry.js`: API module loader
 - `http/`: transport-level routing, request parsing, response adaptation, and CORS
@@ -54,3 +55,4 @@ Handlers may return:
 - prefer plain JS returns for simple REST-style JSON APIs
 - use explicit response objects only when needed
 - keep proxy and persistence infrastructure separate from app orchestration
+- keep source-checkout dev tooling here only when it directly supports the local server workflow

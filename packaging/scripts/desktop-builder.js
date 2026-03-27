@@ -2,10 +2,9 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { build, Platform, Arch, DIR_TARGET } = require("electron-builder");
-
-const PROJECT_ROOT = path.join(__dirname, "..", "..");
+const { PROJECT_ROOT, loadPackagingDependency } = require("./tooling");
 const PACKAGE_JSON_PATH = path.join(PROJECT_ROOT, "package.json");
+const { build, Platform, Arch, DIR_TARGET } = loadPackagingDependency("electron-builder");
 
 const PLATFORM_SPECS = {
   macos: {

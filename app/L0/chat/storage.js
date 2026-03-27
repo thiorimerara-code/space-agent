@@ -11,9 +11,6 @@ export const DEFAULT_CHAT_SETTINGS = {
   model: "openai/gpt-4o-mini"
 };
 
-const DEFAULT_SYSTEM_PROMPT =
-  "You are a helpful assistant inside Agent One. Respond clearly, directly, and use Markdown when useful.";
-
 function readJson(key, fallbackValue) {
   const rawValue = window.localStorage.getItem(key);
   if (!rawValue) {
@@ -68,7 +65,7 @@ export function clearChatDraft() {
 }
 
 export function loadSystemPrompt() {
-  return window.localStorage.getItem(STORAGE_KEYS.systemPrompt) || DEFAULT_SYSTEM_PROMPT;
+  return window.localStorage.getItem(STORAGE_KEYS.systemPrompt) || "";
 }
 
 export function saveSystemPrompt(systemPrompt) {

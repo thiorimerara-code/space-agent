@@ -1,0 +1,9 @@
+{
+  "name": "@agent-one/packaging",
+  "private": true,
+  "description": "Native desktop packaging toolchain for Agent One.",
+  "dependencies": {
+    "electron": "^35.1.4",
+    "electron-builder": "^26.0.12"
+  }
+}

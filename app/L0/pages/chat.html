@@ -9,33 +9,6 @@
   </head>
   <body class="app-page app-page-chat">
     <main class="chat-shell">
-      <header class="chat-header">
-        <div>
-          <p class="page-eyebrow">Single Chat</p>
-          <h1 class="page-title">Chat</h1>
-        </div>
-        <div class="chat-header-actions">
-          <button type="button" class="secondary-button" data-chat-system-button>System Prompt</button>
-          <button type="button" class="secondary-button" data-chat-settings-button>Connection</button>
-          <button type="button" class="secondary-button danger" data-chat-clear-button>Clear</button>
-        </div>
-      </header>
-
-      <section class="chat-meta">
-        <div class="meta-card">
-          <span class="meta-label">Endpoint</span>
-          <span class="meta-value" data-chat-endpoint-summary>OpenRouter</span>
-        </div>
-        <div class="meta-card">
-          <span class="meta-label">Model</span>
-          <span class="meta-value" data-chat-model-summary>Loading...</span>
-        </div>
-        <div class="meta-card">
-          <span class="meta-label">System Prompt</span>
-          <span class="meta-value" data-chat-prompt-summary>Loading...</span>
-        </div>
-      </section>
-
       <section class="chat-thread-wrap">
         <div class="chat-thread" data-chat-thread></div>
       </section>
@@ -55,6 +28,30 @@
           </div>
         </form>
       </footer>
+
+      <header class="chat-header">
+        <section class="chat-meta" aria-label="Chat options">
+          <button type="button" class="chat-option" data-chat-settings-button>
+            <span class="chat-option-label">Endpoint</span>
+            <span class="chat-option-value" data-chat-endpoint-summary>OpenRouter</span>
+            <x-icon>edit</x-icon>
+          </button>
+          <button type="button" class="chat-option" data-chat-settings-button>
+            <span class="chat-option-label">Model</span>
+            <span class="chat-option-value" data-chat-model-summary>Loading...</span>
+            <x-icon>edit</x-icon>
+          </button>
+          <button type="button" class="chat-option chat-option-prompt" data-chat-system-button>
+            <span class="chat-option-label">System Prompt</span>
+            <span class="chat-option-value" data-chat-prompt-summary>Loading...</span>
+            <x-icon>edit</x-icon>
+          </button>
+        </section>
+
+        <div class="chat-header-actions">
+          <button type="button" class="secondary-button danger chat-clear-button" data-chat-clear-button>Clear</button>
+        </div>
+      </header>
     </main>
 
     <dialog class="chat-dialog" data-chat-system-dialog>
@@ -70,6 +67,7 @@
           <textarea rows="12" data-chat-system-input></textarea>
         </label>
         <div class="dialog-actions">
+          <button type="button" class="secondary-button" data-chat-system-default>Default</button>
           <button type="button" class="secondary-button" data-chat-system-cancel>Cancel</button>
           <button type="submit" class="primary-button">Save Prompt</button>
         </div>

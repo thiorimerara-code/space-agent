@@ -64,11 +64,12 @@ function extractNonStreamingMessage(payload) {
 
 function createRequestBody(settings, systemPrompt, messages) {
   const requestMessages = [];
+  const effectiveSystemPrompt = typeof systemPrompt === "string" ? systemPrompt.trim() : "";
 
-  if (systemPrompt.trim()) {
+  if (effectiveSystemPrompt.trim()) {
     requestMessages.push({
       role: "system",
-      content: systemPrompt.trim()
+      content: effectiveSystemPrompt.trim()
     });
   }
 

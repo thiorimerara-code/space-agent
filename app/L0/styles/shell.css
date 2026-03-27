@@ -136,13 +136,17 @@ textarea {
 @media (max-width: 960px) {
   .shell {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
     height: calc(100vh - 12px);
     margin: 6px;
   }
 
   .shell-sidebar {
-    flex-direction: row;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
@@ -150,11 +154,20 @@ textarea {
   .shell-nav {
     grid-auto-flow: column;
     justify-content: center;
+    gap: 8px;
     width: auto;
+  }
+
+  .shell-nav-button {
+    width: 44px;
   }
 
   .shell-sidebar-footer {
     margin-top: 0;
     width: auto;
+  }
+
+  .shell-main {
+    min-height: 0;
   }
 }

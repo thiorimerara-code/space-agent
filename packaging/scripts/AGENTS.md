@@ -16,4 +16,5 @@
 
 - keep wrappers thin and push shared logic into `desktop-builder.js`
 - prefer Node-based automation over shell-specific packaging scripts
+- load Electron and electron-builder from `packaging/package.json`
 - keep this directory ready for future mobile packaging entrypoints

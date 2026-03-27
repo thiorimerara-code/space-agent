@@ -7,8 +7,9 @@
   "main": "packaging/desktop/main.js",
   "scripts": {
     "start": "node A1.js serve",
-    "dev": "node --watch A1.js serve",
-    "desktop:dev": "electron .",
+    "dev": "node server/dev-server.js",
+    "install:packaging": "npm install --prefix packaging",
+    "desktop:dev": "node packaging/scripts/run-desktop-dev.js",
     "desktop:pack": "node packaging/scripts/package-host.js --dir",
     "desktop:dist": "node packaging/scripts/package-host.js",
     "desktop:dist:mac": "node packaging/scripts/package-macos.js",
@@ -61,10 +62,6 @@
         "tar.gz"
       ]
     }
-  },
-  "devDependencies": {
-    "electron": "^35.1.4",
-    "electron-builder": "^26.0.12"
   },
   "nodejsformobile": {
     "entry": "A1.js",
