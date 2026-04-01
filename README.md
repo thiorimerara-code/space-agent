@@ -20,7 +20,6 @@ This repo is currently organized around a layered browser runtime:
 ## Requirements
 
 - Node.js 20 or newer
-- Git on `PATH` if you want to use the source updater
 
 ## Source Install
 
@@ -30,6 +29,8 @@ Install the runtime dependencies and start the local browser-first app:
 npm install
 npm run dev
 ```
+
+CLI commands also read project-local `.env` and `.env.local` files when present.
 
 `npm run dev` uses a small supervisor under `server/` to watch `A1.js`, `commands/`, and `server/`, then restarts the local server when server-side code changes.
 Browser files under `app/` still need a manual browser refresh because live reload is not wired in yet.
@@ -98,7 +99,7 @@ Examples:
 
 ## Updating A Source Checkout
 
-The updater is for source checkouts only. It requires Git and a real git worktree.
+The updater is for source checkouts only. It requires a real git worktree.
 
 Update the current branch:
 
@@ -133,8 +134,9 @@ Update behavior:
 - tag and commit updates stay on a branch when a current or remembered branch can be recovered
 - detached HEAD is only used as a fallback when no branch can be recovered
 - tracked local changes block the update so internal files are not silently overwritten
-
-If Git is missing, the updater prints a platform-specific install hint instead of failing with a raw spawn error.
+- the update backend order is native Git first, then NodeGit if it is installed and loadable, then bundled `isomorphic-git`
+- set `A1_GIT_BACKEND` to `native`, `nodegit`, or `isomorphic` if you need to force a specific backend
+- when the fallback backend has to reach a private HTTPS remote, provide credentials with `AGENT_ONE_GIT_TOKEN`, `GITHUB_TOKEN`, or `GH_TOKEN`
 
 ## CLI Surface
 

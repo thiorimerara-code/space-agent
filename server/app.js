@@ -1,6 +1,15 @@
 const http = require("node:http");
-const { API_DIR, APP_DIR, ASSET_DIR, DEFAULT_HOST, DEFAULT_PORT } = require("./config");
+const {
+  API_DIR,
+  APP_DIR,
+  ASSET_DIR,
+  DEFAULT_HOST,
+  DEFAULT_PORT,
+  FILE_WATCH_CONFIG_PATH,
+  PROJECT_ROOT
+} = require("./config");
 const { loadApiRegistry } = require("./api-registry");
+const { createFileIndex } = require("./lib/file-watch/path-index.cjs");
 const { sendJson } = require("./http/handlers");
 const { createRequestHandler } = require("./http/router");
 
@@ -19,14 +28,23 @@ function createAgentServer(overrides = {}) {
   const browserHost = overrides.browserHost || resolveBrowserHost(host);
   const port = Number(overrides.port || DEFAULT_PORT);
   const assetDir = overrides.assetDir || ASSET_DIR;
+  const projectRoot = overrides.projectRoot || PROJECT_ROOT;
+  const fileIndex =
+    overrides.fileIndex ||
+    createFileIndex({
+      configPath: overrides.fileWatchConfigPath || FILE_WATCH_CONFIG_PATH,
+      projectRoot
+    });
   const apiRegistry = loadApiRegistry(apiDir);
   const requestHandler = createRequestHandler({
     apiDir,
     apiRegistry,
     appDir,
     assetDir,
+    fileIndex,
     host,
-    port
+    port,
+    projectRoot
   });
   const server = http.createServer((req, res) => {
     Promise.resolve(requestHandler(req, res)).catch((error) => {
@@ -52,9 +70,12 @@ function createAgentServer(overrides = {}) {
     host,
     port,
     assetDir,
+    fileIndex,
     server,
     browserUrl: `http://${browserHost}:${port}`,
-    listen() {
+    async listen() {
+      await fileIndex.start();
+
       return new Promise((resolve, reject) => {
         server.once("error", reject);
         server.listen(port, host, () => {
@@ -67,9 +88,24 @@ function createAgentServer(overrides = {}) {
             host,
             port,
             assetDir,
+            fileIndex,
             server,
             browserUrl: `http://${browserHost}:${port}`
           });
+        });
+      });
+    },
+    async close() {
+      fileIndex.stop();
+
+      await new Promise((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          resolve();
         });
       });
     }

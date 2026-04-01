@@ -20,7 +20,12 @@ function sendJson(res, statusCode, payload) {
   res.end(body);
 }
 
-function sendFile(res, filePath) {
+function sendFile(res, filePath, options = {}) {
+  if (options.knownMissing) {
+    sendJson(res, 404, { error: "File not found" });
+    return;
+  }
+
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || "application/octet-stream";
 

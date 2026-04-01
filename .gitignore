@@ -8,3 +8,4 @@ coverage
 release
 /app/L1/
 /app/L2/
+.env

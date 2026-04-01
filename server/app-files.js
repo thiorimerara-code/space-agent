@@ -30,9 +30,13 @@ function globToRegExp(pattern) {
   for (let index = 0; index < pattern.length; index += 1) {
     const char = pattern[index];
     const nextChar = pattern[index + 1];
+    const afterNextChar = pattern[index + 2];
 
     if (char === "*") {
-      if (nextChar === "*") {
+      if (nextChar === "*" && afterNextChar === "/") {
+        out += "(?:.*/)?";
+        index += 2;
+      } else if (nextChar === "*") {
         out += ".*";
         index += 1;
       } else {
@@ -145,6 +149,8 @@ function listAppFiles(appDir, requestedPaths) {
 }
 
 module.exports = {
+  globToRegExp,
+  hasGlob,
   listAppFiles,
   normalizePathSegment
 };

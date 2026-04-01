@@ -67,5 +67,8 @@
     "entry": "A1.js",
     "defaultCommand": "serve",
     "purpose": "Thin mobile-compatible server bridge for fetch proxying and SQLite access."
+  },
+  "dependencies": {
+    "isomorphic-git": "^1.37.4"
   }
 }

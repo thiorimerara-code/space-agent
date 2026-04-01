@@ -1,5 +1,6 @@
 const path = require("node:path");
 const { URL } = require("node:url");
+const { toProjectPath } = require("../lib/file-watch/store.cjs");
 const { sendApiResult, sendFile, sendJson } = require("./handlers");
 const { applyApiCorsHeaders, handleApiPreflight } = require("./cors");
 const { readParsedRequestBody } = require("./request-body");
@@ -101,7 +102,7 @@ async function handleApiModuleRequest(req, res, requestUrl, apiModule, contextOp
 }
 
 function createRequestHandler(options) {
-  const { apiDir, apiRegistry, appDir, assetDir, host, port } = options;
+  const { apiDir, apiRegistry, appDir, assetDir, fileIndex, host, port, projectRoot } = options;
 
   return async function requestHandler(req, res) {
     const requestUrl = new URL(req.url, `http://${req.headers.host || `${host}:${port}`}`);
@@ -121,6 +122,7 @@ function createRequestHandler(options) {
         apiDir,
         appDir,
         assetDir,
+        fileIndex,
         host,
         port
       });
@@ -130,7 +132,14 @@ function createRequestHandler(options) {
     const filePath = requestUrl.pathname.startsWith("/assets/")
       ? resolveStaticPath(assetDir, requestUrl.pathname.slice("/assets".length))
       : resolveStaticPath(appDir, requestUrl.pathname);
-    sendFile(res, filePath);
+    const projectPath = projectRoot ? toProjectPath(projectRoot, filePath) : "";
+    const knownMissing = Boolean(
+      fileIndex && projectPath && fileIndex.covers(projectPath) && !fileIndex.has(projectPath)
+    );
+
+    sendFile(res, filePath, {
+      knownMissing
+    });
   };
 }
 

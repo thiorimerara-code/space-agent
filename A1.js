@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -10,6 +11,59 @@ const COMMAND_ALIASES = new Map([
   ["--help", "help"],
   ["--version", "version"]
 ]);
+
+function parseDotEnvValue(rawValue) {
+  const trimmedValue = String(rawValue || "").trim();
+  if (!trimmedValue) {
+    return "";
+  }
+
+  const firstChar = trimmedValue[0];
+  const lastChar = trimmedValue[trimmedValue.length - 1];
+  if ((firstChar === '"' && lastChar === '"') || (firstChar === "'" && lastChar === "'")) {
+    return trimmedValue.slice(1, -1);
+  }
+
+  return trimmedValue;
+}
+
+function loadDotEnvFile(filePath) {
+  if (!fsSync.existsSync(filePath)) {
+    return;
+  }
+
+  if (typeof process.loadEnvFile === "function") {
+    process.loadEnvFile(filePath);
+    return;
+  }
+
+  const contents = fsSync.readFileSync(filePath, "utf8");
+  const lines = contents.split(/\r?\n/);
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine || trimmedLine.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = trimmedLine.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = trimmedLine.slice(0, separatorIndex).trim();
+    if (!key || Object.prototype.hasOwnProperty.call(process.env, key)) {
+      continue;
+    }
+
+    process.env[key] = parseDotEnvValue(trimmedLine.slice(separatorIndex + 1));
+  }
+}
+
+function loadProjectEnvFiles(projectRoot) {
+  loadDotEnvFile(path.join(projectRoot, ".env"));
+  loadDotEnvFile(path.join(projectRoot, ".env.local"));
+}
 
 function normalizeCommandName(rawValue) {
   const normalizedValue = String(rawValue || "help").trim().toLowerCase();
@@ -49,6 +103,8 @@ async function loadCommandModule(commandName) {
 }
 
 async function run() {
+  loadProjectEnvFiles(__dirname);
+
   const argv = process.argv.slice(2);
   const commandName = normalizeCommandName(argv[0]);
   const args = argv.slice(1);
