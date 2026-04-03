@@ -11,6 +11,10 @@ function createHttpError(message, statusCode) {
   return error;
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value) && !Buffer.isBuffer(value);
+}
+
 function stripTrailingSlash(value) {
   const text = String(value || "");
   return text.endsWith("/") ? text.slice(0, -1) : text;
@@ -318,70 +322,297 @@ function ensureValidWriteEncoding(encoding) {
   throw createHttpError(`Unsupported write encoding: ${String(encoding || "")}`, 400);
 }
 
-function readAppFile(options = {}) {
-  const projectRoot = String(options.projectRoot || "");
+function normalizeReadEntries(options = {}) {
+  if (Array.isArray(options.files)) {
+    if (options.files.length === 0) {
+      throw createHttpError("File read batch must not be empty.", 400);
+    }
+
+    return options.files;
+  }
+
+  if ("files" in options) {
+    throw createHttpError("File read batch must provide a files array.", 400);
+  }
+
+  return [
+    {
+      encoding: options.encoding,
+      path: options.path
+    }
+  ];
+}
+
+function normalizeReadRequests(options = {}) {
   const pathIndex = getPathIndex(options.watchdog);
   const accessController = createAppAccessController({
     groupIndex: getGroupIndex(options.watchdog),
     username: options.username
   });
-  const resolvedPath = resolveExistingProjectPath(
-    pathIndex,
-    resolveUserShorthandPath(options.path, accessController.username)
-  );
+  const entries = normalizeReadEntries(options);
 
-  if (!resolvedPath.projectPath || !resolvedPath.exists) {
-    throw createHttpError("File not found.", 404);
-  }
+  return entries.map((entry) => {
+    const request = isPlainObject(entry) ? entry : { path: entry };
+    const requestedPath = String(request.path || "").trim();
 
-  if (resolvedPath.isDirectory) {
-    throw createHttpError("Expected a file path.", 400);
-  }
+    if (!requestedPath) {
+      throw createHttpError("File path must not be empty.", 400);
+    }
 
-  ensureReadableProjectPath(resolvedPath.projectPath, accessController);
+    const resolvedPath = resolveExistingProjectPath(
+      pathIndex,
+      resolveUserShorthandPath(requestedPath, accessController.username)
+    );
 
-  const encoding = ensureValidReadEncoding(String(options.encoding || "utf8").toLowerCase());
-  const buffer = fs.readFileSync(createAbsolutePath(projectRoot, resolvedPath.projectPath));
+    if (!resolvedPath.projectPath || !resolvedPath.exists) {
+      throw createHttpError(`File not found: ${requestedPath}`, 404);
+    }
+
+    if (resolvedPath.isDirectory) {
+      throw createHttpError(`Expected a file path: ${requestedPath}`, 400);
+    }
+
+    ensureReadableProjectPath(resolvedPath.projectPath, accessController);
+
+    return {
+      absolutePath: createAbsolutePath(String(options.projectRoot || ""), resolvedPath.projectPath),
+      encoding: ensureValidReadEncoding(String(request.encoding || options.encoding || "utf8").toLowerCase()),
+      path: toAppRelativePath(resolvedPath.projectPath)
+    };
+  });
+}
+
+function readAppFiles(options = {}) {
+  const requests = normalizeReadRequests(options);
+  const files = requests.map((request) => {
+    const buffer = fs.readFileSync(request.absolutePath);
+
+    return {
+      content: request.encoding === "base64" ? buffer.toString("base64") : buffer.toString("utf8"),
+      encoding: request.encoding,
+      path: request.path
+    };
+  });
 
   return {
-    content: encoding === "base64" ? buffer.toString("base64") : buffer.toString("utf8"),
-    encoding,
-    path: toAppRelativePath(resolvedPath.projectPath)
+    count: files.length,
+    files
   };
 }
 
-function writeAppFile(options = {}) {
-  const projectRoot = String(options.projectRoot || "");
-  const normalizedProjectPath = normalizeAppProjectPath(
-    resolveUserShorthandPath(options.path, normalizeEntityId(options.username))
-  );
+function readAppFile(options = {}) {
+  return readAppFiles(options).files[0];
+}
 
-  if (!normalizedProjectPath || normalizedProjectPath.endsWith("/")) {
-    throw createHttpError("Expected a writable file path.", 400);
+function normalizeWriteEntries(options = {}) {
+  if (Array.isArray(options.files)) {
+    if (options.files.length === 0) {
+      throw createHttpError("File write batch must not be empty.", 400);
+    }
+
+    return options.files;
   }
 
+  if ("files" in options) {
+    throw createHttpError("File write batch must provide a files array.", 400);
+  }
+
+  return [
+    {
+      content: options.content,
+      encoding: options.encoding,
+      path: options.path
+    }
+  ];
+}
+
+function normalizeWriteRequests(options = {}) {
   const accessController = createAppAccessController({
     groupIndex: getGroupIndex(options.watchdog),
     username: options.username
   });
+  const entries = normalizeWriteEntries(options);
+  const seenProjectPaths = new Set();
 
-  ensureWritableProjectPath(normalizedProjectPath, accessController);
+  return entries.map((entry) => {
+    if (!isPlainObject(entry)) {
+      throw createHttpError("Each file write entry must be an object.", 400);
+    }
 
-  const encoding = ensureValidWriteEncoding(String(options.encoding || "utf8").toLowerCase());
-  const content = options.content;
-  const absolutePath = createAbsolutePath(projectRoot, normalizedProjectPath);
-  const buffer =
-    encoding === "base64"
-      ? Buffer.from(String(content || ""), "base64")
-      : Buffer.from(String(content ?? ""), "utf8");
+    const requestedPath = String(entry.path || "").trim();
+    const isDirectory = requestedPath.endsWith("/");
+    const normalizedProjectPath = normalizeAppProjectPath(
+      resolveUserShorthandPath(requestedPath, accessController.username),
+      {
+        isDirectory
+      }
+    );
 
-  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
-  fs.writeFileSync(absolutePath, buffer);
+    if (!normalizedProjectPath) {
+      throw createHttpError(`Expected a writable path: ${requestedPath || "(empty)"}`, 400);
+    }
+
+    if (seenProjectPaths.has(normalizedProjectPath)) {
+      throw createHttpError(`Duplicate file write path: ${toAppRelativePath(normalizedProjectPath)}`, 400);
+    }
+
+    seenProjectPaths.add(normalizedProjectPath);
+    ensureWritableProjectPath(normalizedProjectPath, accessController);
+
+    if (isDirectory) {
+      const content = entry.content;
+
+      if (content !== undefined && content !== null && content !== "") {
+        throw createHttpError(`Directory writes do not accept content: ${requestedPath}`, 400);
+      }
+
+      return {
+        absolutePath: createAbsolutePath(String(options.projectRoot || ""), normalizedProjectPath),
+        isDirectory: true,
+        path: toAppRelativePath(normalizedProjectPath)
+      };
+    }
+
+    const encoding = ensureValidWriteEncoding(String(entry.encoding || options.encoding || "utf8").toLowerCase());
+    const buffer =
+      encoding === "base64"
+        ? Buffer.from(String(entry.content ?? ""), "base64")
+        : Buffer.from(String(entry.content ?? ""), "utf8");
+
+    return {
+      absolutePath: createAbsolutePath(String(options.projectRoot || ""), normalizedProjectPath),
+      buffer,
+      encoding,
+      isDirectory: false,
+      path: toAppRelativePath(normalizedProjectPath)
+    };
+  });
+}
+
+function writeAppFiles(options = {}) {
+  const requests = normalizeWriteRequests(options);
+  let totalBytesWritten = 0;
+  const files = requests.map((request) => {
+    if (request.isDirectory) {
+      fs.mkdirSync(request.absolutePath, { recursive: true });
+
+      return {
+        path: request.path
+      };
+    }
+
+    fs.mkdirSync(path.dirname(request.absolutePath), { recursive: true });
+    fs.writeFileSync(request.absolutePath, request.buffer);
+    totalBytesWritten += request.buffer.length;
+
+    return {
+      bytesWritten: request.buffer.length,
+      encoding: request.encoding,
+      path: request.path
+    };
+  });
 
   return {
-    bytesWritten: buffer.length,
-    encoding,
-    path: toAppRelativePath(normalizedProjectPath)
+    bytesWritten: totalBytesWritten,
+    count: files.length,
+    files
+  };
+}
+
+function writeAppFile(options = {}) {
+  return writeAppFiles(options).files[0];
+}
+
+function normalizeDeleteEntries(options = {}) {
+  if (Array.isArray(options.paths)) {
+    if (options.paths.length === 0) {
+      throw createHttpError("File delete batch must not be empty.", 400);
+    }
+
+    return options.paths;
+  }
+
+  if ("paths" in options) {
+    throw createHttpError("File delete batch must provide a paths array.", 400);
+  }
+
+  return [options.path];
+}
+
+function normalizeDeleteRequests(options = {}) {
+  const pathIndex = getPathIndex(options.watchdog);
+  const accessController = createAppAccessController({
+    groupIndex: getGroupIndex(options.watchdog),
+    username: options.username
+  });
+  const entries = normalizeDeleteEntries(options);
+  const requests = entries.map((entry) => {
+    const request = isPlainObject(entry) ? entry : { path: entry };
+    const requestedPath = String(request.path || "").trim();
+
+    if (!requestedPath) {
+      throw createHttpError("File path must not be empty.", 400);
+    }
+
+    const resolvedPath = resolveExistingProjectPath(
+      pathIndex,
+      resolveUserShorthandPath(requestedPath, accessController.username)
+    );
+
+    if (!resolvedPath.projectPath || !resolvedPath.exists) {
+      throw createHttpError(`Path not found: ${requestedPath}`, 404);
+    }
+
+    ensureWritableProjectPath(resolvedPath.projectPath, accessController);
+
+    return {
+      absolutePath: createAbsolutePath(String(options.projectRoot || ""), resolvedPath.projectPath),
+      isDirectory: resolvedPath.isDirectory,
+      path: toAppRelativePath(resolvedPath.projectPath),
+      projectPath: resolvedPath.projectPath
+    };
+  });
+
+  requests.forEach((request, index) => {
+    requests.slice(0, index).forEach((previousRequest) => {
+      if (request.projectPath === previousRequest.projectPath) {
+        throw createHttpError(`Duplicate file delete path: ${request.path}`, 400);
+      }
+
+      if (
+        isDescendantPath(request.projectPath, previousRequest.projectPath) ||
+        isDescendantPath(previousRequest.projectPath, request.projectPath)
+      ) {
+        throw createHttpError(
+          `Overlapping file delete paths are not allowed: ${previousRequest.path} and ${request.path}`,
+          400
+        );
+      }
+    });
+  });
+
+  return requests;
+}
+
+function deleteAppPaths(options = {}) {
+  const requests = normalizeDeleteRequests(options);
+  const paths = requests.map((request) => {
+    fs.rmSync(request.absolutePath, {
+      force: false,
+      recursive: request.isDirectory
+    });
+    return request.path;
+  });
+
+  return {
+    count: paths.length,
+    paths
+  };
+}
+
+function deleteAppPath(options = {}) {
+  return {
+    path: deleteAppPaths(options).paths[0]
   };
 }
 
@@ -568,9 +799,13 @@ function listAppPathsByPatterns(options = {}) {
 export {
   createAppAccessController,
   createHttpError,
+  deleteAppPath,
+  deleteAppPaths,
   listAppPaths,
   listAppPathsByPatterns,
   readAppFile,
+  readAppFiles,
   toAppRelativePath,
-  writeAppFile
+  writeAppFile,
+  writeAppFiles
 };

@@ -8,7 +8,7 @@ const ADMIN_AGENT_AVATAR_PATH = "/mod/_core/admin/res/helmet_no_bg_256.webp";
 
 export function summarizeSystemPrompt(systemPrompt) {
   if (!systemPrompt.trim()) {
-    return "No system prompt";
+    return "Default only";
   }
 
   const preview = systemPrompt.trim().replace(/\s+/gu, " ");
@@ -24,14 +24,14 @@ function summarizeEndpoint(endpoint) {
 }
 
 export function summarizeLlmConfig(apiEndpoint, model) {
-  const provider = summarizeEndpoint(apiEndpoint);
   const normalizedModel = typeof model === "string" ? model.trim() : "";
+  const provider = summarizeEndpoint(apiEndpoint);
 
-  if (provider && normalizedModel) {
-    return `${provider}/${normalizedModel}`;
+  if (normalizedModel) {
+    return normalizedModel;
   }
 
-  return normalizedModel || provider || "Not set";
+  return provider || "Not set";
 }
 
 export function autoResizeTextarea(textarea) {
@@ -646,7 +646,20 @@ function createExecutionCard({ executeDisplay, isConversationBusy, isStreaming, 
   if (executeDisplay && messageId) {
     const actions = document.createElement("div");
     actions.className = "execution-details-actions";
+
+    const rawButton = document.createElement("button");
+    rawButton.type = "button";
+    rawButton.className = "execution-detail-button";
+    rawButton.dataset.messageAction = "show-raw";
+    rawButton.dataset.messageId = messageId;
+    const rawIcon = document.createElement("x-icon");
+    rawIcon.textContent = "data_object";
+    const rawLabel = document.createElement("span");
+    rawLabel.textContent = "Raw";
+    rawButton.append(rawIcon, rawLabel);
+
     actions.append(
+      rawButton,
       createExecutionDetailButton({
         action: "copy-input",
         disabled: !getTerminalInputText(executeDisplay),
@@ -735,8 +748,6 @@ function createAssistantSequenceBubble(group, options = {}) {
           rerunningMessageId: options.rerunningMessageId
         })
       );
-
-      sectionElement.append(createAssistantMessageActionRow(section.message, section.outputResults));
     } else {
       sectionElement.classList.add("is-followup");
       const followupBlock = createFormattedMessageBlock(
@@ -936,6 +947,10 @@ export function renderMessages(thread, history, options = {}) {
     return;
   }
 
+  if (!history.length && thread.classList.contains("is-empty")) {
+    return;
+  }
+
   const scrollSnapshots = captureThreadScrollSnapshots(thread, options);
 
   thread.innerHTML = "";
@@ -944,10 +959,30 @@ export function renderMessages(thread, history, options = {}) {
   if (!history.length) {
     const emptyState = document.createElement("div");
     emptyState.className = "chat-empty";
-    emptyState.textContent =
-      typeof options.emptyStateText === "string" && options.emptyStateText.trim()
-        ? options.emptyStateText
-        : "Admin Agent is ready.";
+
+    const bounceZone = document.createElement("div");
+    bounceZone.className = "chat-empty-bounce";
+
+    const astronautWrap = document.createElement("div");
+    astronautWrap.className = "chat-empty-astronaut-wrap";
+    const xPhase = (Math.random() * 18).toFixed(2);
+    const yPhase = (Math.random() * 13.4).toFixed(2);
+    astronautWrap.style.animationDelay = `-${xPhase}s, -${yPhase}s, 0.6s`;
+
+    const astronaut = document.createElement("img");
+    astronaut.className = "chat-empty-astronaut";
+    astronaut.src = "/pages/res/astronaut_no_bg.webp";
+    astronaut.alt = "";
+    astronaut.setAttribute("aria-hidden", "true");
+
+    astronautWrap.append(astronaut);
+    bounceZone.append(astronautWrap);
+
+    const hint = document.createElement("div");
+    hint.className = "chat-empty-hint";
+    hint.textContent = "Message the Admin agent about user management, development, or other tasks.";
+
+    emptyState.append(bounceZone, hint);
     thread.classList.add("is-empty");
     thread.append(emptyState);
     window.requestAnimationFrame(() => {

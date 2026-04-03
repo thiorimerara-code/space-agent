@@ -35,22 +35,37 @@ That means:
 - avoid top-level side effects, heavy startup work, or environment-specific initialization during import
 - keep parsing and validation explicit inside the command module instead of relying on hidden global state
 
+Non-command command-tree assets should stay out of `commands/*.js`. Shared helpers belong under subfolders such as `commands/lib/`, and command-owned metadata files such as `commands/params.yaml` should stay non-JavaScript so the loader does not treat them as commands.
+
+`commands/params.yaml` is the command-owned schema for CLI-managed server config parameters. Each top-level key is the `.env` variable name, and each entry currently uses:
+
+- `description`
+- `type` with `text` or `number`
+- `allowed` as an inline list
+
+Parameter validation rules:
+
+- `text` entries may use exact values, glob-style patterns with `*` and `?`, or `/regex/` patterns in `allowed`
+- `number` entries may use exact numeric values or inclusive ranges such as `1024..65535` in `allowed`
+
 The `help` export should be complete enough that `node space help <command>` is useful without reading the code. Prefer accurate usage lines, concrete descriptions, explicit argument descriptions when position matters, and examples when the command shape is not obvious.
 
 ## Current Commands
 
+- `get`
 - `group`
-- `serve`
 - `help`
+- `serve`
+- `set`
 - `user`
-- `version`
 - `update`
+- `version`
 
 ## Command Families
 
 There are two kinds of commands in this tree:
 
-- operational commands that control or inspect the local runtime: `serve`, `help`, `version`, `update`
+- operational commands that control or inspect the local runtime: `serve`, `help`, `get`, `set`, `version`, `update`
 - state-management commands that edit layered runtime data under `app/`: `user` and `group`
 
 The preferred shape is a small number of readable top-level commands with explicit subcommands. Do not add one file per tiny action when a subcommand fits the existing command family cleanly.
@@ -99,6 +114,49 @@ Guidance:
 
 - command help text is part of the CLI contract; keep it accurate
 - if a command grows new flags or subcommands, update both the module help and this file
+
+### `get`
+
+Purpose:
+
+- read CLI-managed server config parameters from the project `.env`
+- expose the parameter catalog defined in `commands/params.yaml`
+
+Current usage:
+
+- `node space get`
+- `node space get <param>`
+
+Behavior summary:
+
+- with no parameter, it lists every available parameter from `commands/params.yaml` with the current stored `.env` value, type, description, and allowed values
+- with a parameter name, it prints that parameter and its current stored `.env` value
+
+Guidance:
+
+- keep `get` read-only
+- keep the printed parameter catalog aligned with `commands/params.yaml`
+
+### `set`
+
+Purpose:
+
+- validate and write CLI-managed server config parameters into the project `.env`
+
+Current usage:
+
+- `node space set <param> <value>`
+
+Behavior summary:
+
+- parameter names are defined by `commands/params.yaml`
+- `set` validates the value against the parameter's `type` and `allowed` rules before writing `.env`
+- `set` updates only the target key and preserves unrelated `.env` entries
+
+Guidance:
+
+- keep `set` limited to explicit parameter writes; do not let it mutate unrelated runtime state
+- if server config validation rules change, update both the command logic and `commands/params.yaml`
 
 ### `version`
 

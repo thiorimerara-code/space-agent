@@ -40,30 +40,39 @@ function isMissingFileError(error) {
 
 function normalizeStoredConfig(parsedConfig) {
   const storedConfig = parsedConfig && typeof parsedConfig === "object" ? parsedConfig : {};
+  const storedMaxTokens =
+    storedConfig.max_tokens ?? storedConfig.maxTokens ?? config.DEFAULT_ADMIN_CHAT_SETTINGS.maxTokens;
 
   return {
     settings: {
       apiEndpoint: String(storedConfig.api_endpoint || storedConfig.apiEndpoint || config.DEFAULT_ADMIN_CHAT_SETTINGS.apiEndpoint || "").trim(),
       apiKey: String(storedConfig.api_key || storedConfig.apiKey || config.DEFAULT_ADMIN_CHAT_SETTINGS.apiKey || "").trim(),
+      maxTokens: config.normalizeAdminChatMaxTokens(storedMaxTokens),
       model: String(storedConfig.model || config.DEFAULT_ADMIN_CHAT_SETTINGS.model || "").trim(),
       paramsText: String(storedConfig.params || storedConfig.paramsText || config.DEFAULT_ADMIN_CHAT_SETTINGS.paramsText || "").trim()
     },
-    systemPrompt: String(storedConfig.system_prompt || storedConfig.systemPrompt || "").trim()
+    systemPrompt: String(
+      storedConfig.custom_system_prompt ||
+        storedConfig.customSystemPrompt ||
+        storedConfig.system_prompt ||
+        storedConfig.systemPrompt ||
+        ""
+    ).trim()
   };
 }
 
-function buildStoredConfigPayload({ defaultSystemPrompt = "", settings, systemPrompt }) {
+function buildStoredConfigPayload({ settings, systemPrompt }) {
   const normalizedSystemPrompt = typeof systemPrompt === "string" ? systemPrompt.trim() : "";
-  const normalizedDefaultPrompt = typeof defaultSystemPrompt === "string" ? defaultSystemPrompt.trim() : "";
   const payload = {
     api_endpoint: String(settings?.apiEndpoint || config.DEFAULT_ADMIN_CHAT_SETTINGS.apiEndpoint || "").trim(),
     api_key: String(settings?.apiKey || config.DEFAULT_ADMIN_CHAT_SETTINGS.apiKey || "").trim(),
+    max_tokens: config.normalizeAdminChatMaxTokens(settings?.maxTokens),
     model: String(settings?.model || config.DEFAULT_ADMIN_CHAT_SETTINGS.model || "").trim(),
     params: String(settings?.paramsText || config.DEFAULT_ADMIN_CHAT_SETTINGS.paramsText || "").trim()
   };
 
-  if (normalizedSystemPrompt && normalizedSystemPrompt !== normalizedDefaultPrompt) {
-    payload.system_prompt = normalizedSystemPrompt;
+  if (normalizedSystemPrompt) {
+    payload.custom_system_prompt = normalizedSystemPrompt;
   }
 
   return payload;

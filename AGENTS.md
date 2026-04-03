@@ -61,7 +61,7 @@ These rules apply across the codebase:
 Top-level structure:
 
 - `space`: root CLI router that discovers command modules dynamically
-- `commands/`: CLI command modules such as `serve`, `help`, `version`, and `update`
+- `commands/`: CLI command modules such as `serve`, `help`, `get`, `set`, `version`, and `update`
 - `app/`: browser runtime, layered customware model, shared frontend modules, and browser test surfaces
 - `server/`: thin local infrastructure runtime, with root page shells and public shell assets under `server/pages/`, request routing under `server/router/`, API hosting, fetch proxying, watched-file indexes, auth/session infrastructure, and Git support code for update flows
 - `packaging/`: optional Electron host and packaging scripts; keep native hosts thin
@@ -80,7 +80,7 @@ Project concepts:
 - the `/admin` frontend clamps module and extension resolution to `L0` with `maxLayer=0` so admin UI assets stay firmware-backed even though app file APIs still operate on normal `L1` and `L2` paths
 - the browser authenticates through the server, uses a server-issued session cookie for protected API and file access, and clears that session through `/logout`
 - framework composition is rooted at `/mod/_core/framework/js/initFw.js`, which initializes the `space` runtime for the current browser context and imports the extension system before other framework modules so later modules can extend the runtime tree deterministically
-- app file APIs now operate on app-rooted paths such as `L2/alice/user.yaml` or `/app/L2/alice/user.yaml`, not on `/mod/...` cascade paths; `file_read`, `file_write`, and `file_list` also accept `~` or `~/...` as shorthand for the authenticated user's `L2/<username>/...` path
+- app file APIs now operate on app-rooted paths such as `L2/alice/user.yaml` or `/app/L2/alice/user.yaml`, not on `/mod/...` cascade paths; `file_read`, `file_write`, `file_delete`, and `file_list` also accept `~` or `~/...` as shorthand for the authenticated user's `L2/<username>/...` path; `file_read` plus `file_write` accept either single-file input or composed batch `files` input; `file_delete` accepts single-path input or composed batch `paths` input; and `file_write` creates directories when the target path ends with `/`
 - read permissions are: a user can read their own `L2/<username>/`, and can read `L0/<group>/` and `L1/<group>/` for groups they belong to
 - write permissions are: a user can write their own `L2/<username>/`; a user can write `L1/<group>/` only when they manage that group directly or through a managing group include chain; members of `_admin` can write any `L1/` and `L2/` path; nobody writes `L0/`
 - non-`/api` and non-`/mod` browser entry routes are served from `server/pages/`; public shell assets under `/pages/res/...` are served from `server/pages/res/`; `/login` is public and the protected page shells live behind the router-side session gate
@@ -91,6 +91,9 @@ Project concepts:
 Supported CLI surface:
 
 - `node space serve`
+- `node space get`
+- `node space get <param>`
+- `node space set <param> <value>`
 - `node space update`
 - `node space help`
 - `node space --help`

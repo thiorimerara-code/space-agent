@@ -18,10 +18,15 @@ export function get(context) {
     groupIndex && typeof groupIndex.getManagedGroupsForUser === "function"
       ? groupIndex.getManagedGroupsForUser(username)
       : [];
+  const isAdmin =
+    groupIndex && typeof groupIndex.isUserInGroup === "function"
+      ? groupIndex.isUserInGroup(username, "_admin")
+      : false;
 
   return {
     fullName: String(userRecord?.fullName || username),
     groups: Array.isArray(groups) ? groups : [],
+    isAdmin,
     managedGroups: Array.isArray(managedGroups) ? managedGroups : [],
     username
   };

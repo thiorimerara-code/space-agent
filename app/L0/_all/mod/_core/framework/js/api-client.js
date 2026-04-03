@@ -14,7 +14,16 @@
 
 /**
  * @typedef {{
- *   endpoint: string,
+ *   path: string,
+ *   content?: string,
+ *   encoding?: string,
+ *   bytesWritten?: number
+ * }} FileApiEntry
+ */
+
+/**
+ * @typedef {{
+ *   endpoint?: string,
  *   recursive?: boolean,
  *   paths?: string[],
  *   path: string,
@@ -26,8 +35,48 @@
 
 /**
  * @typedef {{
+ *   count: number,
+ *   files: FileApiEntry[],
+ *   bytesWritten?: number
+ * }} FileBatchApiResult
+ */
+
+/**
+ * @typedef {{
+ *   count: number,
+ *   paths: string[]
+ * }} PathBatchApiResult
+ */
+
+/**
+ * @typedef {string | { path: string, encoding?: string }} FileReadInput
+ */
+
+/**
+ * @typedef {{ files: FileReadInput[], encoding?: string }} FileReadBatchOptions
+ */
+
+/**
+ * @typedef {{ path: string, content?: string, encoding?: string }} FileWriteInput
+ */
+
+/**
+ * @typedef {{ files: FileWriteInput[], encoding?: string }} FileWriteBatchOptions
+ */
+
+/**
+ * @typedef {string | { path: string }} FileDeleteInput
+ */
+
+/**
+ * @typedef {{ paths: FileDeleteInput[] }} FileDeleteBatchOptions
+ */
+
+/**
+ * @typedef {{
  *   fullName: string,
  *   groups: string[],
+ *   isAdmin: boolean,
  *   managedGroups: string[],
  *   username: string
  * }} UserSelfInfoResult
@@ -96,6 +145,128 @@ async function createApiError(endpointName, response) {
   return new Error(`API ${endpointName} failed with status ${response.status}: ${detail}`);
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function createFileReadRequest(pathOrFiles, encoding) {
+  if (Array.isArray(pathOrFiles)) {
+    return {
+      method: "POST",
+      body: {
+        encoding,
+        files: pathOrFiles
+      }
+    };
+  }
+
+  if (isPlainObject(pathOrFiles) && Array.isArray(pathOrFiles.files)) {
+    return {
+      method: "POST",
+      body: {
+        encoding: pathOrFiles.encoding ?? encoding,
+        files: pathOrFiles.files
+      }
+    };
+  }
+
+  if (isPlainObject(pathOrFiles) && typeof pathOrFiles.path === "string") {
+    return {
+      method: "POST",
+      body: {
+        encoding: pathOrFiles.encoding ?? encoding,
+        path: pathOrFiles.path
+      }
+    };
+  }
+
+  return {
+    method: "GET",
+    query: {
+      encoding,
+      path: pathOrFiles
+    }
+  };
+}
+
+function createFileWriteRequest(pathOrFiles, content, encoding) {
+  if (Array.isArray(pathOrFiles)) {
+    return {
+      method: "POST",
+      body: {
+        encoding,
+        files: pathOrFiles
+      }
+    };
+  }
+
+  if (isPlainObject(pathOrFiles) && Array.isArray(pathOrFiles.files)) {
+    return {
+      method: "POST",
+      body: {
+        encoding: pathOrFiles.encoding ?? encoding,
+        files: pathOrFiles.files
+      }
+    };
+  }
+
+  if (isPlainObject(pathOrFiles) && typeof pathOrFiles.path === "string") {
+    return {
+      method: "POST",
+      body: {
+        content: pathOrFiles.content,
+        encoding: pathOrFiles.encoding ?? encoding,
+        path: pathOrFiles.path
+      }
+    };
+  }
+
+  return {
+    method: "POST",
+    body: {
+      content,
+      encoding,
+      path: pathOrFiles
+    }
+  };
+}
+
+function createFileDeleteRequest(pathOrPaths) {
+  if (Array.isArray(pathOrPaths)) {
+    return {
+      method: "POST",
+      body: {
+        paths: pathOrPaths
+      }
+    };
+  }
+
+  if (isPlainObject(pathOrPaths) && Array.isArray(pathOrPaths.paths)) {
+    return {
+      method: "POST",
+      body: {
+        paths: pathOrPaths.paths
+      }
+    };
+  }
+
+  if (isPlainObject(pathOrPaths) && typeof pathOrPaths.path === "string") {
+    return {
+      method: "POST",
+      body: {
+        path: pathOrPaths.path
+      }
+    };
+  }
+
+  return {
+    method: "POST",
+    body: {
+      path: pathOrPaths
+    }
+  };
+}
+
 export function createApiClient(options = {}) {
   const basePath = options.basePath || "/api";
 
@@ -155,37 +326,43 @@ export function createApiClient(options = {}) {
    * Read an authenticated app file.
    * `fileRead()` accepts app-rooted paths such as `L2/alice/note.txt` and the
    * `~` or `~/...` shorthand for the current user's `L2/<username>/...` path.
+   * It also accepts composed batch input through a `files` array.
    *
-   * @param {string} path
+   * @param {string | FileReadInput[] | FileReadBatchOptions | FileReadInput} pathOrFiles
    * @param {string} [encoding]
-   * @returns {Promise<FileApiResult>}
+   * @returns {Promise<FileApiResult | FileBatchApiResult>}
    */
-  async function fileRead(path, encoding = "utf8") {
-    return call("file_read", {
-      method: "GET",
-      query: { encoding, path }
-    });
+  async function fileRead(pathOrFiles, encoding = "utf8") {
+    return call("file_read", createFileReadRequest(pathOrFiles, encoding));
   }
 
   /**
    * Write an authenticated app file.
    * `fileWrite()` accepts app-rooted paths such as `L2/alice/note.txt` and the
    * `~` or `~/...` shorthand for the current user's `L2/<username>/...` path.
+   * Paths that end with `/` create directories instead of writing files.
+   * It also accepts composed batch input through a `files` array.
    *
-   * @param {string} path
-   * @param {string} content
+   * @param {string | FileWriteInput[] | FileWriteBatchOptions | FileWriteInput} pathOrFiles
+   * @param {string} [content]
    * @param {string} [encoding]
-   * @returns {Promise<FileApiResult>}
+   * @returns {Promise<FileApiResult | FileBatchApiResult>}
    */
-  async function fileWrite(path, content, encoding = "utf8") {
-    return call("file_write", {
-      method: "POST",
-      body: {
-        encoding,
-        path,
-        content
-      }
-    });
+  async function fileWrite(pathOrFiles, content, encoding = "utf8") {
+    return call("file_write", createFileWriteRequest(pathOrFiles, content, encoding));
+  }
+
+  /**
+   * Delete authenticated app paths.
+   * `fileDelete()` accepts app-rooted paths such as `L2/alice/note.txt`,
+   * `L2/alice/old-folder/`, and the `~` or `~/...` shorthand for the current
+   * user's `L2/<username>/...` path. Directory deletes are recursive.
+   *
+   * @param {string | FileDeleteInput[] | FileDeleteBatchOptions | FileDeleteInput} pathOrPaths
+   * @returns {Promise<FileApiResult | PathBatchApiResult>}
+   */
+  async function fileDelete(pathOrPaths) {
+    return call("file_delete", createFileDeleteRequest(pathOrPaths));
   }
 
   /**
@@ -220,6 +397,7 @@ export function createApiClient(options = {}) {
 
   return {
     call,
+    fileDelete,
     fileList,
     fileRead,
     fileWrite,

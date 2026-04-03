@@ -153,12 +153,16 @@ Use the convenience methods:
 - `await space.api.fileList(path, recursive)`
 - `await space.api.fileRead(path, encoding)`
 - `await space.api.fileWrite(path, content, encoding)`
+- `await space.api.fileDelete(path)`
+- `await space.api.fileRead({ files, encoding? })`
+- `await space.api.fileWrite({ files, encoding? })`
+- `await space.api.fileDelete({ paths })`
 - `await space.api.userSelfInfo()`
 
 Path rules:
 
 - Use app-rooted paths like `"L2/alice/user.yaml"` or `"/app/L2/alice/user.yaml"`.
-- `fileList()`, `fileRead()`, and `fileWrite()` also accept `"~"` or `"~/..."` for the current user's `L2/<username>/...` path.
+- `fileList()`, `fileRead()`, `fileWrite()`, and `fileDelete()` also accept `"~"` or `"~/..."` for the current user's `L2/<username>/...` path.
 - These APIs do NOT use `/mod/...` cascade paths.
 - Directory paths may end with `/`, for example `"L1/"` or `"/app/L2/alice/"`.
 - `user.yaml` contains user metadata. Auth files for a user live under `L2/<username>/meta/`.
@@ -210,13 +214,45 @@ Typical result:
 }
 ```
 
+```text
+_____javascript
+return await space.api.fileRead({
+  files: ["~/conf/admin-chat.yaml", "~/hist/admin-chat.json"]
+})
+```
+
+Typical result:
+
+```json
+{
+  "count": 2,
+  "files": [
+    {
+      "path": "L2/alice/conf/admin-chat.yaml",
+      "encoding": "utf8",
+      "content": "model: gpt-5\\n"
+    },
+    {
+      "path": "L2/alice/hist/admin-chat.json",
+      "encoding": "utf8",
+      "content": "[]\\n"
+    }
+  ]
+}
+```
+
 Notes:
 
 - `fileList(path, true)` lists recursively.
 - `fileRead(path, "base64")` and `fileWrite(path, content, "base64")` are available for binary-safe access.
+- `fileWrite("L2/alice/new-folder/")` creates a directory because the path ends with `/`.
+- `fileDelete("L2/alice/old-folder/")` deletes a directory recursively.
+- `fileRead()` and `fileWrite()` also accept composed batch input through a top-level `files` array. Batch reads return `{ count, files }`; batch writes return `{ count, bytesWritten, files }`.
+- `fileDelete()` also accepts batch input through a top-level `paths` array and returns `{ count, paths }`.
+- Batch file reads, writes, and deletes validate all targets up front and fail fast. If one batch entry is invalid or forbidden, nothing in that batch starts.
 - These calls enforce server-side permissions. If access is denied or the path is invalid, the call throws. Use `try/catch` when needed if the user is exploring unknown paths.
-- `space.api.userSelfInfo()` returns `{ username, fullName, groups, managedGroups }` for the authenticated user.
-- If you need the raw API surface, `space.api.call("file_list", ...)`, `space.api.call("file_read", ...)`, `space.api.call("file_write", ...)`, and `space.api.call("user_self_info", ...)` are also available.
+- `space.api.userSelfInfo()` returns `{ username, fullName, groups, managedGroups, isAdmin }` for the authenticated user.
+- If you need the raw API surface, `space.api.call("file_list", ...)`, `space.api.call("file_read", ...)`, `space.api.call("file_write", ...)`, `space.api.call("file_delete", ...)`, and `space.api.call("user_self_info", ...)` are also available.
 
 ## Frontend YAML Helpers
 

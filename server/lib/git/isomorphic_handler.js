@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import {
   COMMIT_HASH_PATTERN,
   buildHttpAuthOptions,
@@ -6,6 +8,7 @@ import {
   fs,
   normalizeBranchName,
   normalizeRemoteUrl,
+  sanitizeRemoteUrl,
   shortenOid
 } from "./shared.js";
 
@@ -28,6 +31,14 @@ function createRepoOptions(gitContext) {
     fs,
     dir: gitContext.dir,
     gitdir: gitContext.gitdir
+  };
+}
+
+function createTargetRepoOptions(targetDir) {
+  return {
+    fs,
+    dir: targetDir,
+    gitdir: path.join(targetDir, ".git")
   };
 }
 
@@ -58,7 +69,7 @@ export async function createIsomorphicGitClient({ gitContext }) {
   const { git, http } = modules;
   const repoOptions = createRepoOptions(gitContext);
 
-  async function resolveRemoteTransport(remoteName) {
+  async function resolveRemoteTransport(remoteName, authOptions = {}) {
     const remoteUrl = await git.getConfig({
       ...repoOptions,
       path: `remote.${remoteName}.url`
@@ -72,7 +83,7 @@ export async function createIsomorphicGitClient({ gitContext }) {
     return {
       remoteUrl,
       transportUrl,
-      ...buildHttpAuthOptions(transportUrl)
+      ...buildHttpAuthOptions(remoteUrl, authOptions)
     };
   }
 
@@ -94,8 +105,8 @@ export async function createIsomorphicGitClient({ gitContext }) {
       }
     },
 
-    async fetchRemote(remoteName) {
-      const transport = await resolveRemoteTransport(remoteName);
+    async fetchRemote(remoteName, authOptions = {}) {
+      const transport = await resolveRemoteTransport(remoteName, authOptions);
       const result = await git.fetch({
         ...repoOptions,
         http,
@@ -310,6 +321,44 @@ export async function createIsomorphicGitClient({ gitContext }) {
       await git.checkout({
         ...repoOptions,
         force: true
+      });
+    }
+  };
+
+  return createAvailableBackendResult("isomorphic", client);
+}
+
+export async function createIsomorphicGitCloneClient() {
+  let modules;
+  try {
+    modules = await resolveIsomorphicModules();
+  } catch (error) {
+    return createUnavailableBackendResult("isomorphic", error.message);
+  }
+
+  const { git, http } = modules;
+  const client = {
+    name: "isomorphic",
+    label: "isomorphic-git backend",
+
+    async cloneRepository({ authOptions = {}, remoteUrl, targetDir }) {
+      const repoOptions = createTargetRepoOptions(targetDir);
+      const transportUrl = normalizeRemoteUrl(remoteUrl);
+      const auth = buildHttpAuthOptions(remoteUrl, authOptions);
+
+      await fs.promises.mkdir(targetDir, { recursive: true });
+      await git.clone({
+        ...repoOptions,
+        http,
+        remote: "origin",
+        url: transportUrl,
+        ...(auth.onAuth ? { onAuth: auth.onAuth } : {})
+      });
+
+      await git.setConfig({
+        ...repoOptions,
+        path: "remote.origin.url",
+        value: sanitizeRemoteUrl(remoteUrl)
       });
     }
   };

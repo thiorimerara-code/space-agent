@@ -20,7 +20,13 @@ body {
 }
 
 body.app-page-admin {
-  background: #08111d;
+  /* Compact login-inspired shell backdrop for quick testing and easy removal. */
+  background:
+    radial-gradient(1180px 620px at 50% -220px, rgba(148, 188, 255, 0.15) 0%, transparent 74%),
+    radial-gradient(720px 520px at 10% 34%, rgba(121, 237, 216, 0.08) 0%, transparent 76%),
+    radial-gradient(760px 560px at 92% 42%, rgba(148, 188, 255, 0.07) 0%, transparent 76%),
+    radial-gradient(1280px 760px at 50% calc(100% + 300px), rgba(59, 95, 172, 0.22) 0%, transparent 76%),
+    linear-gradient(180deg, var(--color-canvas-elevated) 0%, var(--color-canvas) 52%, var(--color-canvas-deep) 100%);
   color: var(--color-text);
   font: 14px/1.5 "SF Pro Text", "Segoe UI", sans-serif;
   overflow: hidden;
@@ -32,9 +38,19 @@ body.app-page-admin > div[x-data] {
 
 .app-page-admin {
   --admin-shell-width: 1040px;
-  --admin-pane-bg: #0a1422;
+  --admin-pane-bg:
+    radial-gradient(860px 500px at 50% -180px, rgba(148, 188, 255, 0.11) 0%, transparent 76%),
+    radial-gradient(520px 420px at 10% 40%, rgba(121, 237, 216, 0.06) 0%, transparent 76%),
+    radial-gradient(560px 440px at 96% 60%, rgba(148, 188, 255, 0.05) 0%, transparent 76%),
+    linear-gradient(180deg, #0a1422 0%, #08111d 100%);
   --admin-pane-section-bg: #101b2d;
   --admin-pane-section-bg-strong: #0d1727;
+  --admin-main-bg:
+    radial-gradient(960px 560px at 50% -210px, rgba(148, 188, 255, 0.07) 0%, transparent 76%),
+    radial-gradient(620px 460px at 18% 34%, rgba(121, 237, 216, 0.05) 0%, transparent 76%),
+    radial-gradient(620px 500px at 84% 68%, rgba(148, 188, 255, 0.04) 0%, transparent 76%),
+    linear-gradient(180deg, #0b1627 0%, #08111d 100%);
+  --admin-divider-bg: linear-gradient(180deg, rgba(10, 17, 29, 0.98) 0%, rgba(7, 13, 24, 0.98) 100%);
   --admin-border: rgba(168, 186, 219, 0.14);
   --admin-border-strong: rgba(168, 186, 219, 0.24);
 }
@@ -89,7 +105,7 @@ html[data-layout="vertical"] .admin-shell {
 
 .main-pane {
   flex: 1 1 auto;
-  background: #0b1627;
+  background: var(--admin-main-bg);
 }
 
 .main-frame {
@@ -99,14 +115,14 @@ html[data-layout="vertical"] .admin-shell {
   height: 100%;
   min-height: 0;
   border: 0;
-  background: #0b1627;
+  background: var(--admin-main-bg);
 }
 
 .divider {
   position: relative;
   z-index: 1;
   flex: 0 0 var(--divider-size);
-  background: #08111d;
+  background: var(--admin-divider-bg);
 }
 
 .divider::before {
@@ -203,6 +219,14 @@ html[data-layout="vertical"] .divider-handle {
 
 .admin-tab-button x-icon {
   font-size: 28px;
+  flex: 0 0 auto;
+}
+
+.admin-tab-avatar {
+  display: block;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
   flex: 0 0 auto;
 }
 
@@ -307,10 +331,24 @@ html[data-layout="vertical"] .divider-handle {
 
 .admin-info-card p {
   margin: 0;
-  max-width: 58ch;
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
   font-size: 0.96rem;
   line-height: 1.7;
+}
+
+.admin-info-card p.admin-info-note {
+  color: var(--color-text-primary);
+}
+
+.admin-info-card--warning {
+  border-color: var(--color-warning, #c97d00);
+}
+
+.admin-info-card p x-icon {
+  font-size: 1.1em;
+  vertical-align: -3px;
+  margin-right: 6px;
+  opacity: 0.75;
 }
 
 .admin-inline-link {
@@ -381,6 +419,13 @@ html[data-layout="vertical"] .divider-handle {
   font-size: 24px;
 }
 
+.admin-launch-avatar {
+  display: block;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
 .admin-launch-card span {
   font-size: 0.96rem;
   font-weight: 600;
@@ -417,6 +462,120 @@ html[data-layout="vertical"] .divider-handle {
   color: var(--color-text-primary);
   font-size: 1rem;
   font-weight: 600;
+}
+
+.admin-modules-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-modules-title {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.admin-modules-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.admin-modules-refresh:hover,
+.admin-modules-refresh:focus-visible {
+  color: var(--color-text-primary);
+  border-color: var(--admin-border-strong);
+  background: #132033;
+}
+
+.admin-modules-refresh:focus-visible {
+  outline: 2px solid rgba(148, 188, 255, 0.26);
+  outline-offset: 2px;
+}
+
+.admin-modules-refresh:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.admin-module-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-module-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 18px;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-pane-section-bg);
+}
+
+.admin-module-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-module-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.admin-module-layer {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-accent-primary);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.admin-module-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-module-git {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.admin-module-remote {
+  font-size: 0.78rem;
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 @media (max-width: 720px) {

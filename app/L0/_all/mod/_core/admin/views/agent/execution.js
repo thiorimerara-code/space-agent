@@ -9,6 +9,10 @@ const MAX_STRING_LENGTH = 220;
 const MAX_COLLECTION_ENTRIES = 8;
 const MAX_FORMAT_DEPTH = 2;
 
+function isLoadedAdminSkill(value) {
+  return Boolean(value?.__spaceAdminSkill) && typeof value?.content === "string" && typeof value?.path === "string";
+}
+
 function findLineStart(content, index) {
   let lineStart = index;
 
@@ -197,7 +201,23 @@ function formatError(error) {
     return "";
   }
 
-  return error.stack || `${error.name || "Error"}: ${error.message || String(error)}`;
+  const message = `${error.name || "Error"}: ${error.message || String(error)}`;
+
+  if (!error.stack) {
+    return message;
+  }
+
+  // Keep only frames from agent-generated code (identified by the sourceURL pattern)
+  const userFrames = error.stack
+    .split("\n")
+    .filter((line) => /space-admin-agent-execute/.test(line));
+
+  if (!userFrames.length) {
+    // No user frames (e.g. SyntaxError at compile time) — stack is all framework noise
+    return message;
+  }
+
+  return [message, ...userFrames].join("\n");
 }
 
 function formatExecutionValue(value, options) {
@@ -300,6 +320,10 @@ function formatExecutionValue(value, options) {
   }
 
   if (typeof value === "object") {
+    if (isLoadedAdminSkill(value)) {
+      return `[Loaded skill ${value.skillName || value.path}]`;
+    }
+
     if (seen.has(value)) {
       return "[Circular]";
     }
@@ -527,13 +551,20 @@ function formatExecutionResultLines(result) {
     lines.push(`${level}: ${flattenExecutionMessageValue(entry?.text ?? "")}`);
   });
 
+  if (isLoadedAdminSkill(result?.result)) {
+    lines.push(`result: loaded skill ${result.result.skillName || result.result.path}`);
+    lines.push(`skill path: ${result.result.path}`);
+    lines.push("skill content:");
+    lines.push(result.result.content);
+    return lines;
+  }
+
   if (result?.result !== undefined) {
     lines.push(`result: ${flattenExecutionMessageValue(result.resultText)}`);
   }
 
   if (!result?.error?.text && result?.result === undefined && !prints.length) {
-    lines.push("warning: JavaScript finished but returned no result.");
-    lines.push("warning: Use top-level return to send the final value back.");
+    lines.push("no result no console logs");
   }
 
   if (result?.error?.text) {

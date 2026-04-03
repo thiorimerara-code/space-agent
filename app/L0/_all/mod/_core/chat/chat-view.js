@@ -32,14 +32,14 @@ export function summarizeEndpoint(endpoint) {
 }
 
 export function summarizeLlmConfig(apiEndpoint, model) {
-  const provider = summarizeEndpoint(apiEndpoint);
   const normalizedModel = typeof model === "string" ? model.trim() : "";
+  const provider = summarizeEndpoint(apiEndpoint);
 
-  if (provider && normalizedModel) {
-    return `${provider}/${normalizedModel}`;
+  if (normalizedModel) {
+    return normalizedModel;
   }
 
-  return normalizedModel || provider || "Not set";
+  return provider || "Not set";
 }
 
 export function autoResizeTextarea(textarea) {

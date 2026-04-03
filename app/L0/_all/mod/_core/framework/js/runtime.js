@@ -2,12 +2,9 @@ import { createApiClient } from "./api-client.js";
 import { createStore } from "./AlpineStore.js";
 import { downloadProxiedFile } from "./download.js";
 import { installFetchProxy } from "./fetch-proxy.js";
+import * as markdown from "./markdown-frontmatter.js";
 import { buildProxyUrl, isProxyableExternalUrl } from "./proxy-url.js";
-import {
-  parseSimpleYaml,
-  parseYamlScalar,
-  serializeSimpleYaml
-} from "./yaml-lite.js";
+import * as yaml from "./yaml-lite.js";
 
 export function initializeRuntime(options = {}) {
   const apiBasePath = options.apiBasePath || "/api";
@@ -20,6 +17,8 @@ export function initializeRuntime(options = {}) {
     previousRuntime.fw && typeof previousRuntime.fw === "object" ? previousRuntime.fw : {};
   const previousUtils =
     previousRuntime.utils && typeof previousRuntime.utils === "object" ? previousRuntime.utils : {};
+  const previousMarkdownUtils =
+    previousUtils.markdown && typeof previousUtils.markdown === "object" ? previousUtils.markdown : {};
   const previousYamlUtils =
     previousUtils.yaml && typeof previousUtils.yaml === "object" ? previousUtils.yaml : {};
 
@@ -34,11 +33,15 @@ export function initializeRuntime(options = {}) {
     proxyPath,
     utils: {
       ...previousUtils,
+      markdown: {
+        ...previousMarkdownUtils,
+        parseDocument: markdown.parseMarkdownDocument
+      },
       yaml: {
         ...previousYamlUtils,
-        parse: parseSimpleYaml,
-        parseScalar: parseYamlScalar,
-        serialize: serializeSimpleYaml
+        parse: yaml.parseSimpleYaml,
+        parseScalar: yaml.parseYamlScalar,
+        serialize: yaml.serializeSimpleYaml
       }
     },
     fetchExternal(targetUrl, init) {

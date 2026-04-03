@@ -106,6 +106,29 @@ export function isSshLikeRemoteUrl(remoteUrl) {
   return /^[^/@\s]+@[^:/\s]+:.+$/.test(value) || /^ssh:\/\//i.test(value);
 }
 
+export function sanitizeRemoteUrl(remoteUrl) {
+  const value = String(remoteUrl || "").trim();
+
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const parsedUrl = new URL(value);
+
+    if (/^https?:$/i.test(parsedUrl.protocol)) {
+      parsedUrl.username = "";
+      parsedUrl.password = "";
+      return parsedUrl.toString();
+    }
+
+    parsedUrl.password = "";
+    return parsedUrl.toString();
+  } catch {
+    return value;
+  }
+}
+
 export function normalizeRemoteUrl(remoteUrl) {
   const value = String(remoteUrl || "").trim();
   if (!value) {
@@ -131,43 +154,79 @@ export function normalizeRemoteUrl(remoteUrl) {
   );
 }
 
-export function buildHttpAuthOptions(remoteUrl, env = process.env) {
-  const token =
-    env.SPACE_GIT_TOKEN ||
-    env.GITHUB_TOKEN ||
-    env.GH_TOKEN ||
-    null;
+function decodeUrlCredential(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
-  if (token) {
-    const username = env.SPACE_GIT_USERNAME || env.GIT_USERNAME || "git";
+export function resolveGitAuth(remoteUrl, options = {}, env = process.env) {
+  const explicitToken = String(options?.token || "").trim();
+  const explicitUsername = String(options?.username || "").trim();
 
+  if (explicitToken) {
     return {
-      onAuth() {
-        return {
-          username,
-          password: token
-        };
-      }
+      token: explicitToken,
+      username: explicitUsername || env.SPACE_GIT_USERNAME || env.GIT_USERNAME || "git"
     };
   }
 
   try {
-    const parsedUrl = new URL(remoteUrl);
+    const parsedUrl = new URL(String(remoteUrl || ""));
     if (parsedUrl.username || parsedUrl.password) {
       return {
-        onAuth() {
-          return {
-            username: decodeURIComponent(parsedUrl.username),
-            password: decodeURIComponent(parsedUrl.password)
-          };
-        }
+        token: decodeUrlCredential(parsedUrl.password),
+        username:
+          decodeUrlCredential(parsedUrl.username) ||
+          explicitUsername ||
+          env.SPACE_GIT_USERNAME ||
+          env.GIT_USERNAME ||
+          "git"
       };
     }
   } catch {
     // Ignore URL parsing problems here. The caller already validated the URL.
   }
 
-  return {};
+  const envToken =
+    env.SPACE_GIT_TOKEN ||
+    env.GITHUB_TOKEN ||
+    env.GH_TOKEN ||
+    "";
+
+  return {
+    token: String(envToken || "").trim(),
+    username: explicitUsername || env.SPACE_GIT_USERNAME || env.GIT_USERNAME || "git"
+  };
+}
+
+export function buildHttpAuthOptions(remoteUrl, options = {}, env = process.env) {
+  const auth = resolveGitAuth(remoteUrl, options, env);
+
+  if (!auth.token) {
+    return {};
+  }
+
+  return {
+    onAuth() {
+      return {
+        username: auth.username,
+        password: auth.token
+      };
+    }
+  };
+}
+
+export function buildBasicAuthHeader(remoteUrl, options = {}, env = process.env) {
+  const auth = resolveGitAuth(remoteUrl, options, env);
+
+  if (!auth.token) {
+    return "";
+  }
+
+  return `Basic ${Buffer.from(`${auth.username}:${auth.token}`).toString("base64")}`;
 }
 
 export { fs };

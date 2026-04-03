@@ -50,6 +50,28 @@ function normalizeModuleRequestPath(value) {
   return `/${normalized}`;
 }
 
+function parseModuleDirectoryRequestPath(value) {
+  const normalizedPath = normalizeModuleRequestPath(value);
+  const match = normalizedPath.match(/^\/mod\/([^/]+)\/([^/]+)\/?$/u);
+
+  if (!match) {
+    return null;
+  }
+
+  const authorId = normalizeEntityId(match[1]);
+  const repositoryId = normalizeEntityId(match[2]);
+
+  if (!authorId || !repositoryId) {
+    return null;
+  }
+
+  return {
+    authorId,
+    repositoryId,
+    requestPath: `/mod/${authorId}/${repositoryId}`
+  };
+}
+
 function parseModuleExtensionRequestPath(requestPath) {
   const match = String(requestPath || "").match(/^\/mod\/([^/]+)\/([^/]+)\/ext\/(.+)$/u);
 
@@ -71,6 +93,67 @@ function parseModuleExtensionRequestPath(requestPath) {
     moduleRequestPath: `/mod/${authorId}/${repositoryId}`,
     repositoryId,
     requestPath: `/mod/${authorId}/${repositoryId}/ext/${extensionPath}`
+  };
+}
+
+function parseProjectModuleDirectoryPath(projectPath) {
+  let match = String(projectPath || "").match(/^\/app\/L0\/([^/]+)\/(mod\/[^/]+\/[^/]+)\/$/u);
+
+  if (match) {
+    const ownerId = normalizeEntityId(match[1]);
+    const requestPathInfo = parseModuleDirectoryRequestPath(match[2]);
+
+    if (!ownerId || !requestPathInfo) {
+      return null;
+    }
+
+    return {
+      layer: "L0",
+      ownerId,
+      ownerType: "group",
+      projectPath: String(projectPath),
+      ...requestPathInfo
+    };
+  }
+
+  match = String(projectPath || "").match(/^\/app\/L1\/([^/]+)\/(mod\/[^/]+\/[^/]+)\/$/u);
+
+  if (match) {
+    const ownerId = normalizeEntityId(match[1]);
+    const requestPathInfo = parseModuleDirectoryRequestPath(match[2]);
+
+    if (!ownerId || !requestPathInfo) {
+      return null;
+    }
+
+    return {
+      layer: "L1",
+      ownerId,
+      ownerType: "group",
+      projectPath: String(projectPath),
+      ...requestPathInfo
+    };
+  }
+
+  match = String(projectPath || "").match(/^\/app\/L2\/([^/]+)\/(mod\/[^/]+\/[^/]+)\/$/u);
+
+  if (!match) {
+    return null;
+  }
+
+  const ownerId = normalizeEntityId(match[1]);
+  const requestPathInfo = parseModuleDirectoryRequestPath(match[2]);
+
+  if (!ownerId || !requestPathInfo) {
+    return null;
+  }
+
+  return {
+    layer: "L2",
+    ownerId,
+    ownerType: "user",
+    projectPath: String(projectPath),
+    ...requestPathInfo
   };
 }
 
@@ -350,10 +433,12 @@ function parseAppProjectPath(projectPath) {
 export {
   normalizeAppProjectPath,
   normalizeEntityId,
+  parseModuleDirectoryRequestPath,
   normalizeModuleRequestPath,
   parseAppProjectPath,
   parseModuleExtensionRequestPath,
   parseGroupConfigProjectPath,
+  parseProjectModuleDirectoryPath,
   parseProjectModuleExtensionFilePath,
   parseProjectModuleFilePath,
   parseProjectUserConfigPath,

@@ -34,12 +34,6 @@
   min-width: 0;
 }
 
-.admin-agent-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .chat-option {
   display: inline-flex;
   align-items: center;
@@ -175,11 +169,72 @@
 }
 
 .chat-thread.is-empty {
-  justify-content: center;
+  justify-content: stretch;
 }
 
 .chat-empty {
-  max-width: 46ch;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-empty-bounce {
+  flex: 65 1 0;
+  position: relative;
+  overflow: hidden;
+  min-height: 120px;
+}
+
+/* Wrapper: bounces in X and Y via left/top — no transform conflict with spin.  */
+/* Phase delays are set randomly by JS so direction differs each load.           */
+/* Starts invisible; fades in after 0.6s once already in motion.                */
+.chat-empty-astronaut-wrap {
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  opacity: 0;
+  animation:
+    admin-bounce-x 18s linear infinite alternate,
+    admin-bounce-y 13.4s linear infinite alternate,
+    admin-fadein 1s ease 0.6s forwards;
+}
+
+@keyframes admin-bounce-x {
+  from { left: 0; }
+  to   { left: calc(100% - 96px); }
+}
+
+@keyframes admin-bounce-y {
+  from { top: 0; }
+  to   { top: calc(100% - 96px); }
+}
+
+@keyframes admin-fadein {
+  to { opacity: 1; }
+}
+
+/* Image only handles rotation */
+.chat-empty-astronaut {
+  display: block;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  animation: admin-bounce-spin 40s linear infinite;
+}
+
+@keyframes admin-bounce-spin {
+  to { transform: rotate(360deg); }
+}
+
+.chat-empty-hint {
+  flex: 35 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 2rem;
+  margin: 0;
+  text-align: center;
   color: var(--color-text-secondary);
   font-size: 0.94rem;
   line-height: 1.72;
@@ -211,6 +266,12 @@
   gap: 0;
 }
 
+.message-row.assistant .message-accessory {
+  flex: 0 0 40px;
+  width: 40px;
+  min-width: 40px;
+}
+
 .message-avatar {
   display: grid;
   place-items: center;
@@ -218,13 +279,17 @@
   width: 34px;
   height: 34px;
   border-radius: 999px;
-  background: #132033;
   color: var(--color-text-secondary);
   overflow: hidden;
 }
 
 .message-avatar-agent {
-  background: #0f1b2d;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
 }
 
 .message-avatar img {
@@ -235,7 +300,13 @@
 }
 
 .message-avatar-user {
+  background: #132033;
   color: var(--color-text-primary);
+}
+
+.message-avatar-agent img {
+  width: 36px;
+  height: 36px;
 }
 
 .message-avatar x-icon {
@@ -248,6 +319,14 @@
   flex: 1 1 auto;
   min-width: 0;
   max-width: min(calc(100% - 46px), 52rem);
+}
+
+.message-row.assistant .message-bubble {
+  max-width: min(calc(100% - 52px), 52rem);
+}
+
+.message-row.terminal-row .message-bubble {
+  gap: 4px;
 }
 
 .message-row.user .message-bubble {
@@ -335,11 +414,11 @@
 
 .assistant-sequence-section {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .assistant-sequence-section + .assistant-sequence-section {
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 .assistant-message-actions {
@@ -400,7 +479,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   cursor: pointer;
 }
 
@@ -469,8 +548,8 @@
 
 .execution-details {
   display: grid;
-  gap: 8px;
-  padding: 0 10px 10px;
+  gap: 6px;
+  padding: 0 8px 8px;
 }
 
 .execution-pane {
@@ -481,7 +560,7 @@
 .execution-pane-scroll {
   overflow: auto;
   max-height: 12rem;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-radius: 10px;
   background: #09131f;
 }
@@ -552,8 +631,81 @@
 }
 
 .admin-agent-composer-wrap {
+  display: grid;
+  gap: 10px;
   padding-top: 12px;
   border-top: 1px solid var(--admin-border);
+}
+
+.admin-agent-history-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 0 12px;
+}
+
+.admin-agent-history-token-count {
+  color: var(--color-text-secondary);
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+
+.admin-agent-history-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  margin-left: auto;
+  gap: 4px;
+}
+
+.admin-agent-history-action {
+  min-height: 28px;
+  padding: 0.22rem 0.58rem;
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+
+.admin-agent-compact-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.admin-agent-compact-button:hover:not(:disabled),
+.admin-agent-compact-button:focus-visible:not(:disabled) {
+  background: rgba(19, 32, 51, 0.94);
+  color: var(--color-accent-primary);
+}
+
+.admin-agent-compact-button:focus-visible {
+  outline: 2px solid rgba(148, 188, 255, 0.18);
+  outline-offset: 2px;
+}
+
+.admin-agent-compact-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-agent-compact-button x-icon {
+  font-size: 16px;
+}
+
+.admin-agent-compact-button.is-active x-icon {
+  animation: admin-agent-spin 0.9s linear infinite;
 }
 
 .chat-composer {
@@ -633,6 +785,12 @@
   gap: 8px;
 }
 
+.dialog-segmented-button x-icon,
+.dialog-icon-button x-icon {
+  color: var(--color-accent-primary);
+  font-size: 16px;
+}
+
 .field {
   display: grid;
   gap: 8px;
@@ -670,6 +828,16 @@
 .dialog-actions {
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+.dialog-actions.prompt-history-dialog-actions {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.dialog-icon-button {
+  min-width: 34px;
+  padding: 0.5rem;
 }
 
 .secondary-button.dialog-segmented-button.is-active {
@@ -711,9 +879,12 @@
     align-items: stretch;
   }
 
-  .admin-agent-toolbar-actions,
   .dialog-actions {
     justify-content: flex-start;
+  }
+
+  .dialog-actions.prompt-history-dialog-actions {
+    justify-content: space-between;
   }
 
   .chat-option {

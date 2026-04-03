@@ -1,9 +1,12 @@
+import * as config from "/mod/_core/admin/views/agent/config.js";
 import * as agentApi from "/mod/_core/admin/views/agent/api.js";
 import * as execution from "/mod/_core/admin/views/agent/execution.js";
 import * as llmParams from "/mod/_core/admin/views/agent/llm-params.js";
 import * as prompt from "/mod/_core/admin/views/agent/prompt.js";
+import * as skills from "/mod/_core/admin/views/agent/skills.js";
 import * as storage from "/mod/_core/admin/views/agent/storage.js";
 import * as agentView from "/mod/_core/admin/views/agent/view.js";
+import { countTextTokens } from "/mod/_core/framework/js/token-count.js";
 
 function createMessage(role, content, options = {}) {
   return {
@@ -95,65 +98,19 @@ function formatPromptHistoryText(messages) {
     .join("\n\n");
 }
 
+function buildPromptHistoryText(systemPrompt, history) {
+  return formatPromptHistoryText(agentApi.buildAdminAgentPromptMessages(systemPrompt, history));
+}
+
 const MAX_PROTOCOL_RETRY_COUNT = 2;
 
-function summarizeProtocolMessage(message, maxLength = 280) {
-  const normalizedMessage = typeof message === "string" ? message.replace(/\s+/g, " ").trim() : "";
-
-  if (normalizedMessage.length <= maxLength) {
-    return normalizedMessage;
-  }
-
-  return `${normalizedMessage.slice(0, maxLength - 3)}...`;
-}
 
 function isExecutionFollowUpKind(kind) {
   return kind === "execution-output" || kind === "execution-retry";
 }
 
-function executionResultHasUsableOutput(result) {
-  if (result?.error) {
-    return true;
-  }
-
-  if (result?.result !== undefined) {
-    return true;
-  }
-
-  return Array.isArray(result?.logs) && result.logs.length > 0;
-}
-
-function executionResultsNeedReturnedValue(results) {
-  if (!Array.isArray(results) || !results.length) {
-    return false;
-  }
-
-  return results.every((result) => !executionResultHasUsableOutput(result));
-}
-
-function buildMissingExecutionResultRetryMessage(executionOutputText) {
-  const summarizedOutput = summarizeProtocolMessage(executionOutputText);
-
-  return [
-    "Protocol correction: the last browser execution finished but returned no result.",
-    `Execution output: "${summarizedOutput}"`,
-    "Space Agent already runs your JavaScript inside an async function.",
-    "Use top-level await directly and end with a top-level return for the value you need.",
-    "Do not wrap the whole snippet in an async IIFE like `(async () => { ... })()` unless you also return it.",
-    "Execute again now. Do not stop until you have a result or a clear error."
-  ].join("\n");
-}
-
-function buildEmptyAssistantRetryMessage(executionOutputText) {
-  const summarizedOutput = summarizeProtocolMessage(executionOutputText);
-
-  return [
-    "Protocol correction: your last reply after browser execution was empty.",
-    `Execution output: "${summarizedOutput}"`,
-    "Read the execution output and continue.",
-    "If another browser step is needed, execute again now.",
-    "Do not stop until you provide a user-facing answer or a clear error."
-  ].join("\n");
+function buildEmptyAssistantRetryMessage() {
+  return "protocol correction: empty response, continue executing or respond if done";
 }
 
 const model = {
@@ -162,12 +119,16 @@ const model = {
   executionContext: null,
   executionOutputOverrides: Object.create(null),
   history: [],
+  historyText: "",
+  historyTokenCount: 0,
   historyPersistPromise: null,
   initializationPromise: null,
+  isCompactingHistory: false,
   isInitialized: false,
   isLoadingDefaultSystemPrompt: false,
   isSending: false,
   pendingHistorySnapshot: null,
+  promptHistoryText: "",
   promptHistoryMessages: [],
   promptHistoryMode: "text",
   promptHistoryTitle: "Prompt History",
@@ -186,18 +147,21 @@ const model = {
   settings: {
     apiEndpoint: "",
     apiKey: "",
+    maxTokens: config.DEFAULT_ADMIN_CHAT_SETTINGS.maxTokens,
     model: "",
     paramsText: ""
   },
   settingsDraft: {
     apiEndpoint: "",
     apiKey: "",
+    maxTokens: config.DEFAULT_ADMIN_CHAT_SETTINGS.maxTokens,
     model: "",
     paramsText: ""
   },
   status: "Loading admin agent...",
   systemPrompt: "",
   systemPromptDraft: "",
+  runtimeSystemPrompt: "",
 
   get composerPlaceholder() {
     const statusText = typeof this.status === "string" ? this.status.trim() : "";
@@ -210,11 +174,15 @@ const model = {
   },
 
   get isComposerInputDisabled() {
-    return !this.isInitialized;
+    return !this.isInitialized || this.isCompactingHistory;
   },
 
   get isComposerSubmitDisabled() {
-    return !this.isInitialized || this.isSending || this.isLoadingDefaultSystemPrompt || !this.draft.trim();
+    return !this.isInitialized || this.isSending || this.isLoadingDefaultSystemPrompt || this.isCompactingHistory || !this.draft.trim();
+  },
+
+  get isCompactDisabled() {
+    return !this.isInitialized || this.isSending || this.isLoadingDefaultSystemPrompt || !this.historyText.trim();
   },
 
   get llmSummary() {
@@ -223,6 +191,14 @@ const model = {
 
   get promptSummary() {
     return agentView.summarizeSystemPrompt(this.systemPrompt);
+  },
+
+  get historyTokenSummary() {
+    return `${config.formatAdminChatTokenCount(this.historyTokenCount)} tokens`;
+  },
+
+  get compactButtonIcon() {
+    return this.isCompactingHistory ? "progress_activity" : "compress";
   },
 
   get promptHistoryContent() {
@@ -240,7 +216,10 @@ const model = {
 
     return this.promptHistoryMessages.map((message) => ({
       content: typeof message?.content === "string" ? message.content : "",
-      role: typeof message?.role === "string" ? message.role.toUpperCase() : "UNKNOWN"
+      role: typeof message?.role === "string" ? message.role.toUpperCase() : "UNKNOWN",
+      tokenCountLabel: `${config.formatAdminChatTokenCount(
+        countTextTokens(typeof message?.content === "string" ? message.content : "")
+      )} tokens`
     }));
   },
 
@@ -253,6 +232,7 @@ const model = {
       this.executionContext = execution.createExecutionContext({
         targetWindow: window
       });
+      skills.installAdminSkillRuntime();
 
       try {
         const [config, storedHistory] = await Promise.all([
@@ -268,19 +248,20 @@ const model = {
         };
         this.systemPrompt = config.systemPrompt;
         this.systemPromptDraft = config.systemPrompt;
-        this.history = storedHistory.map((message) => normalizeStoredMessage(message));
+        this.replaceHistory(storedHistory.map((message) => normalizeStoredMessage(message)));
 
-        this.status = this.systemPrompt.trim() ? "Ready." : "Loading default system prompt...";
-
-        if (!this.systemPrompt.trim()) {
-          this.isLoadingDefaultSystemPrompt = true;
-        }
+        this.status = "Loading default system prompt...";
+        this.isLoadingDefaultSystemPrompt = true;
 
         await this.ensureDefaultSystemPrompt({
-          preserveStatus: Boolean(this.systemPrompt.trim())
+          preserveStatus: true
         });
+        this.systemPrompt = prompt.extractCustomAdminSystemPrompt(this.systemPrompt, this.defaultSystemPrompt);
+        this.systemPromptDraft = this.systemPrompt;
+        await this.refreshRuntimeSystemPrompt();
 
         this.isInitialized = true;
+        this.status = "Ready.";
         this.render();
         this.focusInput();
       } catch (error) {
@@ -325,7 +306,6 @@ const model = {
   },
 
   async ensureDefaultSystemPrompt(options = {}) {
-    const shouldReplaceSystemPrompt = options.replaceCurrent === true;
     const preserveStatus = options.preserveStatus === true;
 
     if (!this.defaultSystemPrompt || options.forceRefresh === true) {
@@ -340,16 +320,38 @@ const model = {
       }
     }
 
-    if (shouldReplaceSystemPrompt || !this.systemPrompt.trim()) {
-      this.systemPrompt = this.defaultSystemPrompt;
-      this.systemPromptDraft = this.defaultSystemPrompt;
-    }
-
     if (!preserveStatus) {
       this.status = "Ready.";
     }
 
     return this.defaultSystemPrompt;
+  },
+
+  async refreshRuntimeSystemPrompt() {
+    this.runtimeSystemPrompt = await prompt.buildRuntimeAdminSystemPrompt(this.systemPrompt, {
+      defaultSystemPrompt: this.defaultSystemPrompt
+    });
+    this.refreshHistoryMetrics();
+    return this.runtimeSystemPrompt;
+  },
+
+  replaceHistory(nextHistory) {
+    this.history = Array.isArray(nextHistory) ? [...nextHistory] : [];
+    this.refreshHistoryMetrics();
+  },
+
+  refreshHistoryMetrics() {
+    this.historyText = buildPromptHistoryText("", this.history);
+    this.promptHistoryText = buildPromptHistoryText(this.runtimeSystemPrompt, this.history);
+    this.historyTokenCount = countTextTokens(this.promptHistoryText);
+  },
+
+  getConfiguredMaxTokens() {
+    return config.normalizeAdminChatMaxTokens(this.settings.maxTokens);
+  },
+
+  isHistoryOverConfiguredMaxTokens() {
+    return Boolean(this.historyText.trim()) && this.historyTokenCount > this.getConfiguredMaxTokens();
   },
 
   serializeHistory() {
@@ -455,7 +457,7 @@ const model = {
   },
 
   openSystemDialog() {
-    this.systemPromptDraft = this.systemPrompt || this.defaultSystemPrompt;
+    this.systemPromptDraft = this.systemPrompt;
     openDialog(this.refs.systemDialog);
   },
 
@@ -463,43 +465,29 @@ const model = {
     closeDialog(this.refs.systemDialog);
   },
 
-  async loadDefaultSystemPromptIntoEditor() {
-    this.status = "Loading default system prompt...";
-
-    try {
-      const defaultSystemPrompt = await this.ensureDefaultSystemPrompt({
-        forceRefresh: true,
-        preserveStatus: true,
-        replaceCurrent: false
-      });
-      this.systemPromptDraft = defaultSystemPrompt;
-      this.status = "Default system prompt loaded into the editor.";
-    } catch (error) {
-      this.status = error.message;
-    }
+  clearSystemPromptDraft() {
+    this.systemPromptDraft = "";
+    this.status = "Custom system instructions cleared in the editor.";
   },
 
-  async persistConfig(options = {}) {
+  async persistConfig() {
     await storage.saveAdminChatConfig({
-      defaultSystemPrompt: options.defaultSystemPrompt || this.defaultSystemPrompt,
       settings: this.settings,
       systemPrompt: this.systemPrompt
     });
   },
 
   async saveSystemPromptFromDialog() {
-    const defaultPrompt = typeof this.defaultSystemPrompt === "string" ? this.defaultSystemPrompt.trim() : "";
     const draftPrompt = typeof this.systemPromptDraft === "string" ? this.systemPromptDraft.trim() : "";
 
-    if (!draftPrompt || (defaultPrompt && draftPrompt === defaultPrompt)) {
-      this.systemPrompt = this.defaultSystemPrompt;
-      this.systemPromptDraft = this.defaultSystemPrompt;
+    if (!draftPrompt) {
+      this.systemPrompt = "";
+      this.systemPromptDraft = "";
 
       try {
-        await this.persistConfig({
-          defaultSystemPrompt: this.defaultSystemPrompt
-        });
-        this.status = "System prompt reset to default.";
+        await this.refreshRuntimeSystemPrompt();
+        await this.persistConfig();
+        this.status = "Custom system instructions reset.";
         this.closeSystemDialog();
       } catch (error) {
         this.status = error.message;
@@ -508,11 +496,13 @@ const model = {
       return;
     }
 
-    this.systemPrompt = this.systemPromptDraft;
+    this.systemPrompt = draftPrompt;
+    this.systemPromptDraft = draftPrompt;
 
     try {
+      await this.refreshRuntimeSystemPrompt();
       await this.persistConfig();
-      this.status = "Custom system prompt updated.";
+      this.status = "Custom system instructions updated.";
       this.closeSystemDialog();
     } catch (error) {
       this.status = error.message;
@@ -528,6 +518,16 @@ const model = {
 
   closeSettingsDialog() {
     closeDialog(this.refs.settingsDialog);
+  },
+
+  resetSettingsDraftToDefaults() {
+    const preservedApiKey = typeof this.settingsDraft.apiKey === "string" ? this.settingsDraft.apiKey : "";
+
+    this.settingsDraft = {
+      ...config.DEFAULT_ADMIN_CHAT_SETTINGS,
+      apiKey: preservedApiKey
+    };
+    this.status = "LLM settings draft reset to defaults except API key.";
   },
 
   openRawDialogForMessage(messageId) {
@@ -547,11 +547,17 @@ const model = {
     closeDialog(this.refs.rawDialog);
   },
 
-  openPromptHistoryDialog() {
-    this.promptHistoryTitle = "Full Prompt History";
-    this.promptHistoryMessages = agentApi.buildAdminAgentPromptMessages(this.systemPrompt, this.history);
-    this.promptHistoryMode = "text";
-    openDialog(this.refs.historyDialog);
+  async openPromptHistoryDialog() {
+    try {
+      const runtimeSystemPrompt = await this.refreshRuntimeSystemPrompt();
+
+      this.promptHistoryTitle = "Full Prompt History";
+      this.promptHistoryMessages = agentApi.buildAdminAgentPromptMessages(runtimeSystemPrompt, this.history);
+      this.promptHistoryMode = "text";
+      openDialog(this.refs.historyDialog);
+    } catch (error) {
+      this.status = error.message;
+    }
   },
 
   closePromptHistoryDialog() {
@@ -569,8 +575,10 @@ const model = {
 
   async saveSettingsFromDialog() {
     const paramsText = typeof this.settingsDraft.paramsText === "string" ? this.settingsDraft.paramsText.trim() : "";
+    let maxTokens = config.DEFAULT_ADMIN_CHAT_SETTINGS.maxTokens;
 
     try {
+      maxTokens = config.parseAdminChatMaxTokens(this.settingsDraft.maxTokens);
       llmParams.parseAdminAgentParamsText(paramsText);
     } catch (error) {
       this.status = error.message;
@@ -580,6 +588,7 @@ const model = {
     this.settings = {
       apiEndpoint: (this.settingsDraft.apiEndpoint || "").trim(),
       apiKey: (this.settingsDraft.apiKey || "").trim(),
+      maxTokens,
       model: (this.settingsDraft.model || "").trim(),
       paramsText
     };
@@ -596,8 +605,9 @@ const model = {
   async handleClearClick() {
     this.closeRawDialog();
     this.rawOutputContent = "";
-    this.history = [];
+    this.replaceHistory([]);
     this.executionOutputOverrides = Object.create(null);
+    this.rerunningMessageId = "";
 
     await this.persistHistory({
       immediate: true
@@ -613,13 +623,17 @@ const model = {
 
   async streamAssistantResponse(requestMessages, assistantMessage) {
     this.status = "Streaming response...";
+    const runtimeSystemPrompt = await prompt.buildRuntimeAdminSystemPrompt(this.systemPrompt, {
+      defaultSystemPrompt: this.defaultSystemPrompt
+    });
 
     await agentApi.streamAdminAgentCompletion({
       settings: this.settings,
-      systemPrompt: this.systemPrompt,
+      systemPrompt: runtimeSystemPrompt,
       messages: requestMessages,
       onDelta: (delta) => {
         assistantMessage.content += delta;
+        this.refreshHistoryMetrics();
         void this.persistHistory();
         this.render();
       }
@@ -631,6 +645,94 @@ const model = {
     });
     this.render();
     return Boolean(assistantMessage.content.trim());
+  },
+
+  async handleCompactClick() {
+    if (this.isSending) {
+      return;
+    }
+
+    await this.init();
+
+    if (this.isLoadingDefaultSystemPrompt) {
+      this.status = "Loading default system prompt...";
+      return;
+    }
+
+    try {
+      await this.refreshRuntimeSystemPrompt();
+    } catch (error) {
+      this.status = error.message;
+      return;
+    }
+
+    await this.compactHistory();
+  },
+
+  async compactHistory(options = {}) {
+    const historyText = this.historyText.trim();
+    const preserveFocus = options.preserveFocus !== false;
+    const statusText =
+      typeof options.statusText === "string" && options.statusText.trim() ? options.statusText.trim() : "Compacting history...";
+
+    if (!historyText) {
+      this.status = "No history to compact.";
+      return false;
+    }
+
+    this.isSending = true;
+    this.isCompactingHistory = true;
+    const previousTokenCount = this.historyTokenCount;
+    this.status = statusText;
+
+    try {
+      const compactPrompt = await prompt.fetchAdminHistoryCompactPrompt();
+      let compactedHistory = "";
+
+      await agentApi.streamAdminAgentCompletion({
+        settings: this.settings,
+        systemPrompt: compactPrompt,
+        messages: [
+          {
+            role: "user",
+            content: historyText
+          }
+        ],
+        onDelta: (delta) => {
+          compactedHistory += delta;
+        }
+      });
+
+      const normalizedCompactedHistory = compactedHistory.trim();
+
+      if (!normalizedCompactedHistory) {
+        throw new Error("History compaction returned no content.");
+      }
+
+      this.executionOutputOverrides = Object.create(null);
+      this.rerunningMessageId = "";
+      this.replaceHistory([
+        createMessage("user", normalizedCompactedHistory, {
+          kind: "history-compact"
+        })
+      ]);
+      await this.persistHistory({
+        immediate: true
+      });
+      this.status = `History compacted from ${previousTokenCount.toLocaleString()} to ${this.historyTokenCount.toLocaleString()} tokens.`;
+      return true;
+    } catch (error) {
+      this.status = error.message;
+      return false;
+    } finally {
+      this.isCompactingHistory = false;
+      this.isSending = false;
+      this.render();
+
+      if (preserveFocus) {
+        this.focusInput();
+      }
+    }
   },
 
   async executeAssistantBlocks(assistantContent) {
@@ -655,7 +757,6 @@ const model = {
   async runConversationLoop(initialUserMessage) {
     let nextUserMessage = initialUserMessage;
     let emptyAssistantRetryCount = 0;
-    let missingExecutionResultRetryCount = 0;
 
     while (nextUserMessage) {
       const requestMessages =
@@ -664,7 +765,7 @@ const model = {
           : [...this.history, nextUserMessage];
       const assistantMessage = createStreamingAssistantMessage();
 
-      this.history = [...requestMessages, assistantMessage];
+      this.replaceHistory([...requestMessages, assistantMessage]);
       void this.persistHistory();
       this.render();
 
@@ -674,12 +775,12 @@ const model = {
         if (!hasAssistantContent) {
           if (isExecutionFollowUpKind(nextUserMessage.kind) && emptyAssistantRetryCount < MAX_PROTOCOL_RETRY_COUNT) {
             emptyAssistantRetryCount += 1;
-            this.history = requestMessages;
+            this.replaceHistory(requestMessages);
             await this.persistHistory({
               immediate: true
             });
             this.render();
-            nextUserMessage = createMessage("user", buildEmptyAssistantRetryMessage(nextUserMessage.content), {
+            nextUserMessage = createMessage("user", buildEmptyAssistantRetryMessage(), {
               kind: "execution-retry"
             });
             this.status = "Retrying: assistant reply was empty after execution...";
@@ -687,6 +788,7 @@ const model = {
           }
 
           assistantMessage.content = "[No content returned]";
+          this.refreshHistoryMetrics();
           await this.persistHistory({
             immediate: true
           });
@@ -697,7 +799,7 @@ const model = {
         assistantMessage.streaming = false;
 
         if (!assistantMessage.content.trim()) {
-          this.history = requestMessages;
+          this.replaceHistory(requestMessages);
         }
 
         await this.persistHistory({
@@ -717,25 +819,12 @@ const model = {
       const executionOutputMessage = createMessage("user", execution.formatExecutionResultsMessage(executionResults), {
         kind: "execution-output"
       });
-      this.history = [...this.history, executionOutputMessage];
+      this.replaceHistory([...this.history, executionOutputMessage]);
       await this.persistHistory({
         immediate: true
       });
       this.render();
 
-      if (
-        executionResultsNeedReturnedValue(executionResults) &&
-        missingExecutionResultRetryCount < MAX_PROTOCOL_RETRY_COUNT
-      ) {
-        missingExecutionResultRetryCount += 1;
-        nextUserMessage = createMessage("user", buildMissingExecutionResultRetryMessage(executionOutputMessage.content), {
-          kind: "execution-retry"
-        });
-        this.status = "Retrying: browser code returned no result...";
-        continue;
-      }
-
-      missingExecutionResultRetryCount = 0;
       nextUserMessage = executionOutputMessage;
       this.status = "Sending code execution output...";
     }
@@ -757,6 +846,24 @@ const model = {
 
     if (!messageText) {
       return;
+    }
+
+    try {
+      await this.refreshRuntimeSystemPrompt();
+    } catch (error) {
+      this.status = error.message;
+      return;
+    }
+
+    if (this.isHistoryOverConfiguredMaxTokens()) {
+      const compacted = await this.compactHistory({
+        preserveFocus: false,
+        statusText: "Compacting history before send..."
+      });
+
+      if (!compacted) {
+        return;
+      }
     }
 
     this.isSending = true;

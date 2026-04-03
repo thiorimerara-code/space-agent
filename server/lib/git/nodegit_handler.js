@@ -4,6 +4,8 @@ import {
   createUnavailableBackendResult,
   isSshLikeRemoteUrl,
   normalizeBranchName,
+  resolveGitAuth,
+  sanitizeRemoteUrl,
   shortenOid
 } from "./shared.js";
 
@@ -77,22 +79,16 @@ function readStatusValue(entry) {
   return entry?.status || 0;
 }
 
-function createFetchOptions(NodeGit, remoteUrl) {
-  const token =
-    process.env.SPACE_GIT_TOKEN ||
-    process.env.GITHUB_TOKEN ||
-    process.env.GH_TOKEN ||
-    null;
-
+function createFetchOptions(NodeGit, remoteUrl, authOptions = {}) {
+  const auth = resolveGitAuth(remoteUrl, authOptions);
   const callbacks = {
     certificateCheck() {
       return 1;
     }
   };
 
-  if (token) {
-    const username = process.env.SPACE_GIT_USERNAME || process.env.GIT_USERNAME || "git";
-    callbacks.credentials = () => NodeGit.Cred.userpassPlaintextNew(username, token);
+  if (auth.token) {
+    callbacks.credentials = () => NodeGit.Cred.userpassPlaintextNew(auth.username || "git", auth.token);
   } else if (isSshLikeRemoteUrl(remoteUrl) && typeof NodeGit.Cred?.sshKeyFromAgent === "function") {
     callbacks.credentials = (_url, userName) => NodeGit.Cred.sshKeyFromAgent(userName || "git");
   }
@@ -187,10 +183,10 @@ export async function createNodeGitClient({ projectRoot }) {
       }
     },
 
-    async fetchRemote(remoteName) {
+    async fetchRemote(remoteName, authOptions = {}) {
       const remote = await repo.getRemote(remoteName);
       const remoteUrl = readNodeGitText(remote.url?.() || remote.url);
-      await repo.fetch(remoteName, createFetchOptions(NodeGit, remoteUrl));
+      await repo.fetch(remoteName, createFetchOptions(NodeGit, remoteUrl, authOptions));
 
       let defaultBranch = null;
       if (typeof remote.defaultBranch === "function") {
@@ -330,6 +326,29 @@ export async function createNodeGitClient({ projectRoot }) {
       const commit = await resolveCommitObject(repo, NodeGit, revision);
       repo.setHeadDetached(commit.id());
       await NodeGit.Checkout.tree(repo, commit, checkoutOptions(NodeGit));
+    }
+  };
+
+  return createAvailableBackendResult("nodegit", client);
+}
+
+export async function createNodeGitCloneClient() {
+  let NodeGit;
+  try {
+    const nodeGitModule = await import("nodegit");
+    NodeGit = nodeGitModule.default || nodeGitModule;
+  } catch {
+    return createUnavailableBackendResult("nodegit", "the optional nodegit package is not installed or not loadable");
+  }
+
+  const client = {
+    name: "nodegit",
+    label: "NodeGit backend",
+
+    async cloneRepository({ authOptions = {}, remoteUrl, targetDir }) {
+      await NodeGit.Clone.clone(sanitizeRemoteUrl(remoteUrl), targetDir, {
+        fetchOpts: createFetchOptions(NodeGit, remoteUrl, authOptions)
+      });
     }
   };
 

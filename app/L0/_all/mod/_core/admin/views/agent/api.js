@@ -65,6 +65,30 @@ function extractNonStreamingMessage(payload) {
   return extractTextContent(message.content || choice.text || "");
 }
 
+function normalizeConversationMessage(message) {
+  if (!["user", "assistant"].includes(message?.role)) {
+    return null;
+  }
+
+  return {
+    content: typeof message.content === "string" ? message.content : "",
+    role: message.role
+  };
+}
+
+export function formatAdminAgentHistoryText(messages) {
+  if (!Array.isArray(messages) || !messages.length) {
+    return "";
+  }
+
+  return messages
+    .map((message) => normalizeConversationMessage(message))
+    .filter(Boolean)
+    .map((message) => `${message.role.toUpperCase()}:\n${message.content}`)
+    .join("\n\n")
+    .trim();
+}
+
 export function buildAdminAgentPromptMessages(systemPrompt, messages) {
   const requestMessages = [];
   const effectiveSystemPrompt = typeof systemPrompt === "string" ? systemPrompt.trim() : "";
@@ -77,14 +101,13 @@ export function buildAdminAgentPromptMessages(systemPrompt, messages) {
   }
 
   messages.forEach((message) => {
-    if (!["user", "assistant"].includes(message?.role)) {
+    const normalizedMessage = normalizeConversationMessage(message);
+
+    if (!normalizedMessage) {
       return;
     }
 
-    requestMessages.push({
-      role: message.role,
-      content: typeof message.content === "string" ? message.content : ""
-    });
+    requestMessages.push(normalizedMessage);
   });
 
   return requestMessages;

@@ -1,0 +1,69 @@
+<html>
+  <head>
+    <script type="module" src="/mod/_core/admin/views/modules/store.js"></script>
+  </head>
+  <body>
+    <div x-data>
+      <template x-if="$store.adminModules">
+        <section
+          class="admin-panel"
+          x-cloak
+          x-init="$store.adminModules.load()"
+        >
+          <div class="admin-modules-header">
+            <h2 class="admin-modules-title">Installed modules</h2>
+            <button
+              class="admin-modules-refresh"
+              type="button"
+              :disabled="$store.adminModules.loading"
+              @click="$store.adminModules.refresh()"
+              title="Refresh"
+            >
+              <x-icon>refresh</x-icon>
+            </button>
+          </div>
+
+          <template x-if="$store.adminModules.error">
+            <div class="admin-card admin-info-card admin-info-card--warning">
+              <p><x-icon>error</x-icon> <span x-text="$store.adminModules.error"></span></p>
+            </div>
+          </template>
+
+          <template x-if="$store.adminModules.loading && !$store.adminModules.loaded">
+            <div class="admin-card admin-placeholder">
+              <x-icon>hourglass_empty</x-icon>
+              <p>Loading modules...</p>
+            </div>
+          </template>
+
+          <template x-if="$store.adminModules.loaded && $store.adminModules.modules.length === 0">
+            <div class="admin-card admin-placeholder">
+              <x-icon>package_2</x-icon>
+              <p>No modules installed</p>
+              <p>Modules installed into L1 or L2 will appear here.</p>
+            </div>
+          </template>
+
+          <template x-if="$store.adminModules.loaded && $store.adminModules.modules.length > 0">
+            <ul class="admin-module-list">
+              <template x-for="mod in $store.adminModules.modules" :key="mod.path">
+                <li class="admin-module-item">
+                  <div class="admin-module-main">
+                    <span class="admin-module-name" x-text="mod.requestPath"></span>
+                    <span class="admin-module-layer" x-text="`${mod.layer} / ${$store.adminModules.formatOwner(mod)}`"></span>
+                  </div>
+                  <div class="admin-module-meta">
+                    <span class="admin-module-git" x-text="$store.adminModules.formatGitSummary(mod.git)"></span>
+                    <template x-if="$store.adminModules.formatRemoteUrl(mod.git)">
+                      <span class="admin-module-remote" x-text="$store.adminModules.formatRemoteUrl(mod.git)"></span>
+                    </template>
+                  </div>
+                </li>
+              </template>
+            </ul>
+          </template>
+        </section>
+      </template>
+    </div>
+  </body>
+</html>

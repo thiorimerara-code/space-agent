@@ -54,7 +54,7 @@ Space Agent already runs your JavaScript inside an async function.
 - Use top-level `await` directly.
 - Use a final top-level `return` when you need a value back.
 - Do not wrap the whole snippet in `(async () => { ... })()`.
-- If execution output shows `execution success` but no `result:` line, that means you did not return a value. Execute again and fix it.
+- If execution output says `no result no console logs`, the code succeeded but produced no return value and no console output.
 
 ## Shape
 
@@ -122,12 +122,17 @@ execution success
 result: done
 ```
 
+It may also look like:
+
+```text
+execution success
+no result no console logs
+```
+
 Read that output. Then either:
 
 - execute again if more browser/admin work is needed
 - answer normally if you are done
-
-If the execution output says it succeeded but did not return a result, do not stop there. Execute again and return the missing value.
 
 Never answer with intent when you can execute now.
 
@@ -158,12 +163,16 @@ Use the convenience methods:
 - `await space.api.fileList(path, recursive)`
 - `await space.api.fileRead(path, encoding)`
 - `await space.api.fileWrite(path, content, encoding)`
+- `await space.api.fileDelete(path)`
+- `await space.api.fileRead({ files, encoding? })`
+- `await space.api.fileWrite({ files, encoding? })`
+- `await space.api.fileDelete({ paths })`
 - `await space.api.userSelfInfo()`
 
 Path rules:
 
 - Use app-rooted paths like `"L1/team-blue/group.yaml"` or `"L2/alice/user.yaml"`.
-- `fileList()`, `fileRead()`, and `fileWrite()` also accept `"~"` or `"~/..."` for the current user's `L2/<username>/...` path.
+- `fileList()`, `fileRead()`, `fileWrite()`, and `fileDelete()` also accept `"~"` or `"~/..."` for the current user's `L2/<username>/...` path.
 - These APIs do NOT use `/mod/...` cascade paths.
 - Directory paths may end with `/`.
 - `user.yaml` contains user metadata. Auth files for a user live under `L2/<username>/meta/`.
@@ -172,9 +181,14 @@ Notes:
 
 - `fileList(path, true)` lists recursively.
 - `fileRead(path, "base64")` and `fileWrite(path, content, "base64")` are available for binary-safe access.
+- `fileWrite("L2/alice/new-folder/")` creates a directory because the path ends with `/`.
+- `fileDelete("L2/alice/old-folder/")` deletes a directory recursively.
+- `fileRead()` and `fileWrite()` also accept composed batch input through a top-level `files` array. Batch reads return `{ count, files }`; batch writes return `{ count, bytesWritten, files }`.
+- `fileDelete()` also accepts batch input through a top-level `paths` array and returns `{ count, paths }`.
+- Batch file reads, writes, and deletes validate all targets up front and fail fast. If one batch entry is invalid or forbidden, nothing in that batch starts.
 - These calls enforce server-side permissions. If access is denied or the path is invalid, the call throws.
-- `space.api.userSelfInfo()` returns `{ username, fullName, groups, managedGroups }` for the authenticated user.
-- If you need the raw API surface, `space.api.call("file_list", ...)`, `space.api.call("file_read", ...)`, `space.api.call("file_write", ...)`, and `space.api.call("user_self_info", ...)` are also available.
+- `space.api.userSelfInfo()` returns `{ username, fullName, groups, managedGroups, isAdmin }` for the authenticated user.
+- If you need the raw API surface, `space.api.call("file_list", ...)`, `space.api.call("file_read", ...)`, `space.api.call("file_write", ...)`, `space.api.call("file_delete", ...)`, and `space.api.call("user_self_info", ...)` are also available.
 
 ## Frontend YAML Helpers
 

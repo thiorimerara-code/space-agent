@@ -1,14 +1,16 @@
+const ADMIN_AGENT_AVATAR_PATH = "/mod/_core/admin/res/helmet_no_bg_256.webp";
+
 const tabs = [
   { id: "dashboard", icon: "space_dashboard", label: "Dashboard" },
-  { id: "agent", icon: "smart_toy", label: "Agent" },
-  { id: "documentation", icon: "description", label: "Documentation" }
+  { id: "agent", avatarPath: ADMIN_AGENT_AVATAR_PATH, label: "Agent" },
+  { id: "modules", icon: "package_2", label: "Modules" }
 ];
 
 const ACTIVE_TAB_STORAGE_KEY = "space.admin.activeTab";
 
 const quickActions = [
-  { id: "open-agent", icon: "smart_toy", label: "Admin agent", targetTab: "agent" },
-  { id: "open-documentation", icon: "description", label: "Documentation", targetTab: "documentation" }
+  { id: "open-agent", avatarPath: ADMIN_AGENT_AVATAR_PATH, label: "Admin agent", targetTab: "agent" },
+  { id: "open-modules", icon: "package_2", label: "Modules", targetTab: "modules" }
 ];
 
 const arrowKeyOffset = {
@@ -20,6 +22,9 @@ const arrowKeyOffset = {
 
 const pageModel = {
   activeTab: "dashboard",
+  userSelfInfo: null,
+  userSelfInfoLoaded: false,
+  userSelfInfoPromise: null,
   refs: {},
   quickActions,
   tabs,
@@ -34,10 +39,15 @@ const pageModel = {
 
   mount(refs = {}) {
     this.refs = refs;
+    void this.loadUserSelfInfo();
   },
 
   unmount() {
     this.refs = {};
+  },
+
+  get isCurrentUserAdmin() {
+    return this.userSelfInfo?.isAdmin === true;
   },
 
   isKnownTab(tabId) {
@@ -66,6 +76,38 @@ const pageModel = {
     } catch {
       // Ignore storage access failures.
     }
+  },
+
+  async loadUserSelfInfo(options = {}) {
+    const forceRefresh = options.forceRefresh === true;
+
+    if (!forceRefresh && this.userSelfInfoLoaded) {
+      return this.userSelfInfo;
+    }
+
+    if (!forceRefresh && this.userSelfInfoPromise) {
+      return this.userSelfInfoPromise;
+    }
+
+    this.userSelfInfoPromise = (async () => {
+      try {
+        const snapshot = await space.api.userSelfInfo();
+        this.userSelfInfo =
+          snapshot && typeof snapshot === "object"
+            ? snapshot
+            : null;
+        this.userSelfInfoLoaded = true;
+        return this.userSelfInfo;
+      } catch {
+        this.userSelfInfo = null;
+        this.userSelfInfoLoaded = false;
+        return null;
+      } finally {
+        this.userSelfInfoPromise = null;
+      }
+    })();
+
+    return this.userSelfInfoPromise;
   },
 
   selectTab(tabId) {

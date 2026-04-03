@@ -1,4 +1,4 @@
-import { createHttpError, readAppFile } from "../lib/customware/file_access.js";
+import { createHttpError, readAppFile, readAppFiles } from "../lib/customware/file_access.js";
 
 function readPayload(context) {
   return context.body && typeof context.body === "object" && !Buffer.isBuffer(context.body)
@@ -16,15 +16,30 @@ function readEncoding(context) {
   return String(payload.encoding || context.params.encoding || "utf8");
 }
 
+function hasBatchRead(payload) {
+  return Boolean(payload) && typeof payload === "object" && Array.isArray(payload.files);
+}
+
 function handleRead(context) {
+  const payload = readPayload(context);
+
   try {
-    return readAppFile({
+    const options = {
       encoding: readEncoding(context),
       path: readPath(context),
       projectRoot: context.projectRoot,
       username: context.user?.username,
       watchdog: context.watchdog
-    });
+    };
+
+    if (hasBatchRead(payload)) {
+      return readAppFiles({
+        ...options,
+        files: payload.files
+      });
+    }
+
+    return readAppFile(options);
   } catch (error) {
     throw createHttpError(error.message || "File read failed.", Number(error.statusCode) || 500);
   }

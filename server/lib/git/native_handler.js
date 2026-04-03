@@ -1,9 +1,12 @@
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 
 import {
+  buildBasicAuthHeader,
   COMMIT_HASH_PATTERN,
   createAvailableBackendResult,
-  createUnavailableBackendResult
+  createUnavailableBackendResult,
+  sanitizeRemoteUrl
 } from "./shared.js";
 
 function createGitError(args, stderr, stdout) {
@@ -11,9 +14,9 @@ function createGitError(args, stderr, stdout) {
   return new Error(`git ${args.join(" ")} failed: ${message}`);
 }
 
-function runGit(projectRoot, args, { check = true } = {}) {
+function runGit(projectRoot, args, { check = true, cwd = projectRoot } = {}) {
   const result = spawnSync("git", args, {
-    cwd: projectRoot,
+    cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -31,6 +34,53 @@ function runGit(projectRoot, args, { check = true } = {}) {
 
 function readGit(projectRoot, args, options) {
   return runGit(projectRoot, args, options).stdout.trim();
+}
+
+function readNativeGitAvailability(cwd) {
+  const versionResult = spawnSync("git", ["--version"], {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  if (versionResult.error) {
+    if (versionResult.error.code === "ENOENT") {
+      return {
+        available: false,
+        reason: "native git is not installed or not on PATH"
+      };
+    }
+
+    return {
+      available: false,
+      reason: versionResult.error.message
+    };
+  }
+
+  if (versionResult.status !== 0) {
+    return {
+      available: false,
+      reason: String(versionResult.stderr || versionResult.stdout || "git --version failed").trim()
+    };
+  }
+
+  return {
+    available: true
+  };
+}
+
+function buildGitAuthConfigArgs(remoteUrl, authOptions = {}) {
+  if (!/^https?:\/\//i.test(String(remoteUrl || "").trim())) {
+    return [];
+  }
+
+  const authorizationHeader = buildBasicAuthHeader(remoteUrl, authOptions);
+
+  if (!authorizationHeader) {
+    return [];
+  }
+
+  return ["-c", `http.extraHeader=Authorization: ${authorizationHeader}`];
 }
 
 function tryReadRevision(projectRoot, revision) {
@@ -60,6 +110,18 @@ function hasRemoteBranch(projectRoot, remoteName, branchName) {
   return result.status === 0;
 }
 
+function readRemoteUrl(projectRoot, remoteName) {
+  const result = runGit(projectRoot, ["config", "--local", "--get", `remote.${remoteName}.url`], {
+    check: false
+  });
+
+  if (result.status !== 0) {
+    return null;
+  }
+
+  return result.stdout.trim() || null;
+}
+
 function readRemoteDefaultBranch(projectRoot, remoteName) {
   const result = runGit(projectRoot, ["symbolic-ref", "--quiet", "--short", `refs/remotes/${remoteName}/HEAD`], {
     check: false
@@ -79,25 +141,9 @@ function readRemoteDefaultBranch(projectRoot, remoteName) {
 }
 
 export async function createNativeGitClient({ projectRoot }) {
-  const versionResult = spawnSync("git", ["--version"], {
-    cwd: projectRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"]
-  });
-
-  if (versionResult.error) {
-    if (versionResult.error.code === "ENOENT") {
-      return createUnavailableBackendResult("native", "native git is not installed or not on PATH");
-    }
-
-    return createUnavailableBackendResult("native", versionResult.error.message);
-  }
-
-  if (versionResult.status !== 0) {
-    return createUnavailableBackendResult(
-      "native",
-      String(versionResult.stderr || versionResult.stdout || "git --version failed").trim()
-    );
+  const availability = readNativeGitAvailability(projectRoot);
+  if (!availability.available) {
+    return createUnavailableBackendResult("native", availability.reason);
   }
 
   const client = {
@@ -124,8 +170,16 @@ export async function createNativeGitClient({ projectRoot }) {
       }
     },
 
-    async fetchRemote(remoteName) {
-      runGit(projectRoot, ["fetch", "--tags", remoteName]);
+    async fetchRemote(remoteName, authOptions = {}) {
+      const remoteUrl = authOptions.remoteUrl || readRemoteUrl(projectRoot, remoteName) || "";
+
+      runGit(projectRoot, [
+        ...buildGitAuthConfigArgs(remoteUrl, authOptions),
+        "fetch",
+        "--tags",
+        remoteName
+      ]);
+
       return {
         defaultBranch: readRemoteDefaultBranch(projectRoot, remoteName)
       };
@@ -173,7 +227,7 @@ export async function createNativeGitClient({ projectRoot }) {
       return tryReadRevision(projectRoot, `refs/tags/${tagName}^{commit}`);
     },
 
-    async resolveCommitRevision(target, remoteName) {
+    async resolveCommitRevision(target, remoteName, authOptions = {}) {
       if (!COMMIT_HASH_PATTERN.test(target)) {
         return null;
       }
@@ -183,7 +237,13 @@ export async function createNativeGitClient({ projectRoot }) {
         return commitRevision;
       }
 
-      runGit(projectRoot, ["fetch", "--no-tags", remoteName, target], { check: false });
+      const remoteUrl = authOptions.remoteUrl || readRemoteUrl(projectRoot, remoteName) || "";
+
+      runGit(
+        projectRoot,
+        [...buildGitAuthConfigArgs(remoteUrl, authOptions), "fetch", "--no-tags", remoteName, target],
+        { check: false }
+      );
       commitRevision = tryReadRevision(projectRoot, `${target}^{commit}`);
 
       return commitRevision || null;
@@ -208,6 +268,32 @@ export async function createNativeGitClient({ projectRoot }) {
 
     async checkoutDetached(revision) {
       runGit(projectRoot, ["checkout", "--detach", revision]);
+    }
+  };
+
+  return createAvailableBackendResult("native", client);
+}
+
+export async function createNativeGitCloneClient({ targetDir }) {
+  const availability = readNativeGitAvailability(path.dirname(targetDir));
+  if (!availability.available) {
+    return createUnavailableBackendResult("native", availability.reason);
+  }
+
+  const client = {
+    name: "native",
+    label: "native git backend",
+
+    async cloneRepository({ authOptions = {}, remoteUrl, targetDir: cloneTargetDir }) {
+      const sanitizedRemoteUrl = sanitizeRemoteUrl(remoteUrl);
+
+      runGit(
+        path.dirname(cloneTargetDir),
+        [...buildGitAuthConfigArgs(remoteUrl, authOptions), "clone", sanitizedRemoteUrl, cloneTargetDir],
+        {
+          cwd: path.dirname(cloneTargetDir)
+        }
+      );
     }
   };
 

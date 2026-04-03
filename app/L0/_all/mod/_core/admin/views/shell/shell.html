@@ -36,7 +36,12 @@
                       @click="$store.adminPage.selectTab(tab.id)"
                       @keydown="$store.adminPage.handleTabKeydown($event, tab.id)"
                     >
-                      <x-icon x-text="tab.icon"></x-icon>
+                      <template x-if="tab.avatarPath">
+                        <img class="admin-tab-avatar" :src="tab.avatarPath" alt="" />
+                      </template>
+                      <template x-if="!tab.avatarPath">
+                        <x-icon x-text="tab.icon"></x-icon>
+                      </template>
                       <span class="admin-tab-label" x-text="tab.label"></span>
                     </button>
                   </template>
@@ -66,14 +71,14 @@
                   </section>
 
                   <section
-                    id="admin-panel-documentation"
+                    id="admin-panel-modules"
                     class="admin-panel-shell"
-                    x-show="$store.adminPage.isTabActive('documentation')"
+                    x-show="$store.adminPage.isTabActive('modules')"
                     x-cloak
                     role="tabpanel"
-                    aria-labelledby="admin-tab-documentation"
+                    aria-labelledby="admin-tab-modules"
                   >
-                    <x-component path="/mod/_core/admin/views/documentation/panel.html"></x-component>
+                    <x-component path="/mod/_core/admin/views/modules/panel.html"></x-component>
                   </section>
                 </div>
               </div>
