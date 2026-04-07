@@ -21,6 +21,7 @@ paths:
 run:
   case_concurrency: all
   active_prompts:
+    - 018_literal_marker_examples
     - 017_marker_state_hardline
     - 002_autonomy_hardline
     - 007_resolved_blocker_executes

@@ -49,6 +49,7 @@ Prompt rules:
 - `compact-prompt.md` is used for user-invoked history compaction
 - `compact-prompt-auto.md` is used for automatic compaction during the loop
 - the runtime prompt also appends the current admin skill catalog built from `skills/*/SKILL.md`
+- `api.js` may fold consecutive prepared `user` or `assistant` payload messages into alternating transport turns with `\n\n` joins immediately before the fetch call, but that transport-only fold must not mutate stored history or prompt-history state
 - the firmware prompt documents `space.api.userSelfInfo()` as `{ username, fullName, groups, managedGroups }`, and admin checks should derive from `groups.includes("_admin")`
 
 ## Execution And UI Contract

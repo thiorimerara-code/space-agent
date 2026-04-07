@@ -40,6 +40,7 @@ Examples:
 - Start with frontmatter containing `name`, `description`, and optional runtime-owned `metadata`.
 - Use `metadata.always_loaded: true` only when the skill should always be present in the system prompt without an explicit `space.skills.load(...)` call.
 - Prompt-facing skill text is token-budgeted. Keep wording terse, avoid unnecessary markdown or filler, and measure before or after changes with the local tokenizer when you edit always-loaded or catalog-facing skill text.
+- When a skill needs reusable browser logic, prefer a small module-local JS helper imported from a stable `/mod/<author>/<repo>/...` path instead of pasting a long inline script into `SKILL.md`.
 - Keep the top-level router skill directive and concise.
 - Keep nested skills focused on one stable area.
 - Prefer exact file paths, runtime names, and examples over vague guidance.
@@ -48,5 +49,6 @@ Examples:
 ## Maintenance Rules
 
 - When a mirrored source contract changes, update the affected skill files in the same session.
+- When a stable feature or workflow changes, update the relevant docs under `/mod/_core/documentation/docs/` and the documentation skill at `/mod/_core/documentation/ext/skills/documentation/SKILL.md` in the same session.
 - Do not let skill guidance drift away from the owning `AGENTS.md` files.
 - For the development super-skill specifically, keep `ext/skills/development/AGENTS.md` current whenever the framework, router, API, layer, or auth contracts it mirrors change.

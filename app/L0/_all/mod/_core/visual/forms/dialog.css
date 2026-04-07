@@ -169,6 +169,32 @@
   width: min(var(--space-dialog-width-wide), calc(100vw - 32px));
 }
 
+.dialog-card-shell {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dialog-card-shell .dialog-header,
+.dialog-card-shell .dialog-actions {
+  flex: 0 0 auto;
+}
+
+.dialog-scroll-body,
+.dialog-scroll-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.dialog-card-shell .raw-output-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
 .dialog-header {
   display: flex;
   align-items: flex-start;
@@ -194,6 +220,35 @@
 
 .dialog-segmented-button {
   min-width: 4.25rem;
+}
+
+.dialog-actions-split {
+  width: 100%;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: nowrap;
+}
+
+.dialog-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.dialog-actions-group-end {
+  margin-left: auto;
+}
+
+.dialog-action-button-fixed {
+  box-sizing: border-box;
+  width: var(--dialog-action-button-width, auto);
+  min-width: var(--dialog-action-button-width, auto);
+  justify-content: center;
+  gap: 0.32rem;
+  padding-inline: var(--dialog-action-button-padding-inline, 0.55rem);
+  white-space: nowrap;
 }
 
 .dialog-icon-button {
@@ -296,6 +351,18 @@
 @media (max-width: 720px) {
   .dialog-actions {
     justify-content: flex-start;
+  }
+
+  .dialog-actions-split {
+    flex-wrap: wrap;
+  }
+
+  .dialog-actions-group {
+    flex-wrap: wrap;
+  }
+
+  .dialog-actions-group-end {
+    margin-left: 0;
   }
 }
 

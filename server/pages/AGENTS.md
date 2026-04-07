@@ -78,4 +78,5 @@ Rules:
 - expose stable anchors and let browser modules own dynamic composition
 - keep recovery-safe shell behavior local to `login.html`, `enter.html`, and `server/pages/res/`
 - do not hardwire authenticated app structure into page shells when an extension seam can own it
+- if page-shell contracts or mirrored public assets change, also update the matching docs under `app/L0/_all/mod/_core/documentation/docs/server/`
 - if page-shell contracts or mirrored public assets change, update this file and the related app docs

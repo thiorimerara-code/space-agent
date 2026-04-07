@@ -85,4 +85,5 @@ Responses:
 - keep routing logic here, not in page or API modules
 - keep page and module serving thin and delegate policy decisions to shared helpers
 - do not bypass `request_context.js` for auth state
+- if routing order, page gating, launcher behavior, or direct app-fetch semantics change, also update the matching docs under `app/L0/_all/mod/_core/documentation/docs/server/`
 - if routing order, auth flow, page handling, or response contracts change, update this file and `/server/AGENTS.md`

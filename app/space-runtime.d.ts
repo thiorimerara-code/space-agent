@@ -261,10 +261,11 @@ type SpaceWidgetRemovalResult = {
   widgetIds: string[];
 };
 
-// Renderer-only edit against the zero-based numbered renderer lines shown in the
-// TRANSIENT Current Widget readback. Metadata fields are updated through explicit
-// patchWidget inputs, and multi-edit patches are applied from the highest original
-// line toward the lowest.
+// Renderer-only edit against the zero-based numbered renderer lines shown in a
+// readWidget() response or the post-write TRANSIENT Current Widget envelope's
+// source↓ block.
+// Metadata fields are updated through explicit patchWidget inputs, and multi-edit
+// patches are applied from the highest original line toward the lowest.
 type SpaceWidgetTextEdit = {
   content?: string;
   from: number;
@@ -334,8 +335,10 @@ type SpaceCurrentNamespace = {
     }
   ): Promise<string>;
   path: string;
-  // Refreshes the TRANSIENT Current Widget readback for the resolved widget and returns a short status string.
+  // Returns the metadata-first numbered widget readback directly in the response.
   readWidget(widgetName: string): Promise<string>;
+  // Returns the current mounted widget instance inner HTML. `full=false` strips JS/CSS-heavy attributes and tags.
+  seeWidget(widgetName: string, full?: boolean): Promise<string>;
   reloadWidget(widgetId: string): Promise<string>;
   specialInstructions: string;
   title: string;

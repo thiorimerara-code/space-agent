@@ -114,4 +114,5 @@ Admin-only access is required for aggregated or cross-user user-layer listings.
 - keep changes to path semantics, inheritance, or permissions centralized here
 - refresh the watchdog after mutations that affect indexed module, group, user, or file state
 - if path, layer, module-resolution, or permission rules change, also update `app/L0/_all/mod/_core/onscreen_agent/ext/skills/development/` because its development skills mirror this contract
+- if path, layer, module-resolution, or permission rules change, also update the matching docs under `app/L0/_all/mod/_core/documentation/docs/server/`
 - if you change path normalization, group semantics, `maxLayer`, file access, or module-management rules, update this file and the relevant server or API docs in the same session

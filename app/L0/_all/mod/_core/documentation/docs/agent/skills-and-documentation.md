@@ -1,0 +1,103 @@
+# Skills And Documentation
+
+This doc covers onscreen skill loading and the documentation skill/helper contract.
+
+## Primary Sources
+
+- `app/L0/_all/mod/_core/onscreen_agent/AGENTS.md`
+- `app/L0/_all/mod/_core/onscreen_agent/skills.js`
+- `app/L0/_all/mod/_core/onscreen_agent/ext/skills/development/AGENTS.md`
+- `app/L0/_all/mod/_core/documentation/AGENTS.md`
+- `app/L0/_all/mod/_core/documentation/documentation.js`
+
+## Skill Discovery
+
+Onscreen skills are discovered from readable module trees:
+
+- top-level catalog pattern: `mod/*/*/ext/skills/*/SKILL.md`
+- full skill tree pattern: `mod/*/*/ext/skills/**/SKILL.md`
+
+Important rules:
+
+- top-level skills appear in the prompt catalog automatically
+- nested skills are not listed by default
+- any readable skill at any depth may still be auto-loaded with `metadata.always_loaded: true`
+- skill ids are relative to `ext/skills/` without the trailing `/SKILL.md`
+
+Examples:
+
+- `ext/skills/documentation/SKILL.md` -> `documentation`
+- `ext/skills/development/modules-routing/SKILL.md` -> `development/modules-routing`
+
+## Loading And Visibility
+
+On-demand loading uses:
+
+```js
+await space.skills.load("skill/path")
+```
+
+Loaded skill content is inserted into execution output and then becomes part of history.
+
+Visibility rules:
+
+- readable group-scoped modules may contribute extra skills
+- admin-only groups may contribute admin-only skills
+- same-module layered overrides replace lower-ranked skill files before the catalog is built
+
+Conflict rules:
+
+- skill ids must be unique across readable modules
+- conflicting ids are omitted from the catalog
+- loading a conflicting id fails with an ambiguity error
+
+## Current First-Party Shared Top-Level Skills
+
+Current repo-owned shared top-level skills include:
+
+- `development`
+- `file-download`
+- `user-management`
+- `spaces`
+- `screenshots`
+- `documentation`
+
+Additional group-scoped skills may exist for narrower audiences.
+
+## Documentation Skill And Helper
+
+Broad orientation starts in the top-level `documentation` skill:
+
+```js
+await space.skills.load("documentation");
+```
+
+That skill carries the compact docs map directly in its body. Use the helper below only for focused follow-up reads once you know the path you need.
+
+The documentation helper lives at:
+
+```txt
+/mod/_core/documentation/documentation.js
+```
+
+Stable exports:
+
+- `read("relative/path.md")`
+- `url("relative/path.md")`
+
+Examples:
+
+```js
+await space.skills.load("documentation");
+const documentation = await import("/mod/_core/documentation/documentation.js");
+const filesDoc = await documentation.read("server/api/files.md");
+```
+
+## How To Use These Docs Correctly
+
+- use the `documentation` skill for fast orientation
+- use the helper for focused doc reads once you know the relative path
+- use the relevant `AGENTS.md` file for the concrete contract
+- use code for exact implementation detail
+
+When you change a stable contract or workflow, update all three layers together.

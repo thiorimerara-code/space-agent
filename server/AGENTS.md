@@ -8,7 +8,7 @@ It should not become the main application runtime. Keep browser concerns in `app
 
 This is one of the five core docs. It owns server-wide responsibilities, request flow, and infrastructure boundaries. Detailed subsystem contracts belong in deeper docs inside `server/`.
 
-Documentation is top priority for this area. After any change under `server/` or any server contract change owned here, update this file and the closest owning subsystem `AGENTS.md` files in the same session before finishing.
+Documentation is top priority for this area. After any change under `server/` or any server contract change owned here, update this file, the closest owning subsystem `AGENTS.md` files, and the relevant supplemental docs under `app/L0/_all/mod/_core/documentation/docs/` in the same session before finishing.
 
 ## Documentation Hierarchy
 
@@ -30,6 +30,7 @@ Update rules:
 - update the nearest subsystem doc when you change a documented server area
 - update this file only when the server-wide contract, request flow, or ownership map changed
 - keep endpoint- or module-specific detail out of this file when a deeper doc can own it
+- when a stable server contract changes, keep the matching documentation-module docs aligned in the same session
 
 ## How To Document Server Child Docs
 

@@ -9,6 +9,7 @@ const threadView = createAgentThreadView({
   emptyStateText: "Send a message to start the onscreen agent thread.",
   execution,
   formatAttachmentSize,
+  groupConsecutiveAvatars: true,
   renderMarkdownWithMarked: true
 });
 

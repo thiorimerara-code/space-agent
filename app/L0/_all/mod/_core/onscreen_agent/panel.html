@@ -288,57 +288,59 @@
                 x-ref="settingsDialog"
                 @cancel.prevent="$store.onscreenAgent.closeSettingsDialog()"
               >
-                <form method="dialog" class="dialog-card" @submit.prevent="$store.onscreenAgent.saveSettingsFromDialog()">
+                <form method="dialog" class="dialog-card dialog-card-shell" @submit.prevent="$store.onscreenAgent.saveSettingsFromDialog()">
                   <header class="dialog-header">
                     <div>
                       <p class="page-eyebrow">Settings</p>
                       <h2>Model, credentials, params, and instructions</h2>
                     </div>
                   </header>
-                  <label class="field">
-                    <span>Provider API Endpoint URL</span>
-                    <input type="url" x-model="$store.onscreenAgent.settingsDraft.apiEndpoint" />
-                  </label>
-                  <label class="field">
-                    <span>Model Name</span>
-                    <input type="text" x-model="$store.onscreenAgent.settingsDraft.model" />
-                  </label>
-                  <label class="field">
-                    <span>Max Tokens</span>
-                    <input type="number" min="1" step="1" inputmode="numeric" x-model="$store.onscreenAgent.settingsDraft.maxTokens" />
-                    <p class="field-note">
-                      Default <code>64000</code>. When prompt history exceeds this, compaction runs automatically before the next send.
+                  <div class="dialog-scroll-body">
+                    <label class="field">
+                      <span>Provider API Endpoint URL</span>
+                      <input type="url" x-model="$store.onscreenAgent.settingsDraft.apiEndpoint" />
+                    </label>
+                    <label class="field">
+                      <span>Model Name</span>
+                      <input type="text" x-model="$store.onscreenAgent.settingsDraft.model" />
+                    </label>
+                    <label class="field">
+                      <span>Max Tokens</span>
+                      <input type="number" min="1" step="1" inputmode="numeric" x-model="$store.onscreenAgent.settingsDraft.maxTokens" />
+                      <p class="field-note">
+                        Default <code>64000</code>. When prompt history exceeds this, compaction runs automatically before the next send.
+                      </p>
+                    </label>
+                    <label class="field">
+                      <span>API Key</span>
+                      <input type="password" x-model="$store.onscreenAgent.settingsDraft.apiKey" />
+                    </label>
+                    <label class="field">
+                      <span>Params</span>
+                      <textarea
+                        rows="6"
+                        spellcheck="false"
+                        placeholder="temperature:0.2"
+                        x-model="$store.onscreenAgent.settingsDraft.paramsText"
+                      ></textarea>
+                      <p class="field-note">
+                        YAML format. Example: <code>temperature:0.2</code>
+                      </p>
+                    </label>
+                    <label class="field">
+                      <span>Custom Instructions</span>
+                      <textarea
+                        rows="8"
+                        x-model="$store.onscreenAgent.systemPromptDraft"
+                      ></textarea>
+                      <p class="field-note">
+                        Appended after the fixed onscreen agent system prompt. Clear this field to use the default prompt only.
+                      </p>
+                    </label>
+                    <p class="dialog-note">
+                      These values and custom instructions are stored in <code>~/conf/onscreen-agent.yaml</code>.
                     </p>
-                  </label>
-                  <label class="field">
-                    <span>API Key</span>
-                    <input type="password" x-model="$store.onscreenAgent.settingsDraft.apiKey" />
-                  </label>
-                  <label class="field">
-                    <span>Params</span>
-                    <textarea
-                      rows="6"
-                      spellcheck="false"
-                      placeholder="temperature:0.2"
-                      x-model="$store.onscreenAgent.settingsDraft.paramsText"
-                    ></textarea>
-                    <p class="field-note">
-                      YAML format. Example: <code>temperature:0.2</code>
-                    </p>
-                  </label>
-                  <label class="field">
-                    <span>Custom Instructions</span>
-                    <textarea
-                      rows="8"
-                      x-model="$store.onscreenAgent.systemPromptDraft"
-                    ></textarea>
-                    <p class="field-note">
-                      Appended after the fixed onscreen agent system prompt. Clear this field to use the default prompt only.
-                    </p>
-                  </label>
-                  <p class="dialog-note">
-                    These values and custom instructions are stored in <code>~/conf/onscreen-agent.yaml</code>.
-                  </p>
+                  </div>
                   <div class="dialog-actions">
                     <button type="button" class="secondary-button" @click="$store.onscreenAgent.resetSettingsDraftToDefaults()">
                       Defaults
@@ -377,7 +379,7 @@
                 x-ref="historyDialog"
                 @cancel.prevent="$store.onscreenAgent.closePromptHistoryDialog()"
               >
-                <div class="dialog-card dialog-card-raw">
+                <div class="dialog-card dialog-card-raw dialog-card-shell">
                   <header class="dialog-header">
                     <div>
                       <p class="page-eyebrow">Context Window</p>
@@ -406,7 +408,7 @@
                       </div>
                     </div>
                   </header>
-                  <div class="raw-output-frame" data-prompt-history-frame>
+                  <div class="raw-output-frame dialog-scroll-frame" data-prompt-history-frame>
                     <template x-if="$store.onscreenAgent.promptHistoryMode === 'text'">
                       <div class="prompt-history-list">
                         <template x-if="!$store.onscreenAgent.promptHistorySections.length">
@@ -432,35 +434,11 @@
                       ></pre>
                     </template>
                   </div>
-                  <div
-                    class="prompt-history-actions"
-                    style="
-                      --prompt-history-action-width: 5.8rem;
-                      display: flex;
-                      align-items: center;
-                      justify-content: space-between;
-                      gap: 1rem;
-                      width: 100%;
-                      margin-top: 1rem;
-                      flex-wrap: nowrap;
-                    "
-                  >
-                    <div
-                      class="prompt-history-actions-left"
-                      style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: nowrap;"
-                    >
+                  <div class="dialog-actions dialog-actions-split prompt-history-actions">
+                    <div class="dialog-actions-group prompt-history-actions-left">
                       <button
                         type="button"
-                        class="secondary-button prompt-history-action-button"
-                        style="
-                          box-sizing: border-box;
-                          width: var(--prompt-history-action-width);
-                          min-width: var(--prompt-history-action-width);
-                          justify-content: center;
-                          gap: 0.32rem;
-                          padding-inline: 0.55rem;
-                          white-space: nowrap;
-                        "
+                        class="secondary-button dialog-action-button-fixed prompt-history-action-button"
                         title="Jump to first real user message"
                         aria-label="Jump to first real user message"
                         :disabled="!$store.onscreenAgent.hasPromptHistoryUserMessages"
@@ -471,16 +449,7 @@
                       </button>
                       <button
                         type="button"
-                        class="secondary-button prompt-history-action-button"
-                        style="
-                          box-sizing: border-box;
-                          width: var(--prompt-history-action-width);
-                          min-width: var(--prompt-history-action-width);
-                          justify-content: center;
-                          gap: 0.32rem;
-                          padding-inline: 0.55rem;
-                          white-space: nowrap;
-                        "
+                        class="secondary-button dialog-action-button-fixed prompt-history-action-button"
                         title="Jump to previous real user message"
                         aria-label="Jump to previous real user message"
                         :disabled="!$store.onscreenAgent.canJumpToPreviousPromptHistoryUserMessage"
@@ -490,16 +459,7 @@
                       </button>
                       <button
                         type="button"
-                        class="secondary-button prompt-history-action-button"
-                        style="
-                          box-sizing: border-box;
-                          width: var(--prompt-history-action-width);
-                          min-width: var(--prompt-history-action-width);
-                          justify-content: center;
-                          gap: 0.32rem;
-                          padding-inline: 0.55rem;
-                          white-space: nowrap;
-                        "
+                        class="secondary-button dialog-action-button-fixed prompt-history-action-button"
                         title="Jump to next real user message"
                         aria-label="Jump to next real user message"
                         :disabled="!$store.onscreenAgent.canJumpToNextPromptHistoryUserMessage"
@@ -508,22 +468,10 @@
                         <x-icon>keyboard_arrow_down</x-icon>
                       </button>
                     </div>
-                    <div
-                      class="prompt-history-actions-right"
-                      style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: nowrap; margin-left: auto;"
-                    >
+                    <div class="dialog-actions-group dialog-actions-group-end prompt-history-actions-right">
                       <button
                         type="button"
-                        class="secondary-button prompt-history-action-button"
-                        style="
-                          box-sizing: border-box;
-                          width: var(--prompt-history-action-width);
-                          min-width: var(--prompt-history-action-width);
-                          justify-content: center;
-                          gap: 0.32rem;
-                          padding-inline: 0.55rem;
-                          white-space: nowrap;
-                        "
+                        class="secondary-button dialog-action-button-fixed prompt-history-action-button"
                         title="Copy system prompt"
                         aria-label="Copy system prompt"
                         @click="$store.onscreenAgent.copyPromptHistorySystemPrompt()"
@@ -533,16 +481,7 @@
                       </button>
                       <button
                         type="button"
-                        class="secondary-button prompt-history-action-button"
-                        style="
-                          box-sizing: border-box;
-                          width: var(--prompt-history-action-width);
-                          min-width: var(--prompt-history-action-width);
-                          justify-content: center;
-                          gap: 0.32rem;
-                          padding-inline: 0.55rem;
-                          white-space: nowrap;
-                        "
+                        class="secondary-button dialog-action-button-fixed prompt-history-action-button"
                         title="Copy history"
                         aria-label="Copy history"
                         @click="$store.onscreenAgent.copyPromptHistoryHistory()"
@@ -552,16 +491,7 @@
                       </button>
                       <button
                         type="button"
-                        class="secondary-button prompt-history-action-button"
-                        style="
-                          box-sizing: border-box;
-                          width: var(--prompt-history-action-width);
-                          min-width: var(--prompt-history-action-width);
-                          justify-content: center;
-                          gap: 0.32rem;
-                          padding-inline: 0.55rem;
-                          white-space: nowrap;
-                        "
+                        class="secondary-button dialog-action-button-fixed prompt-history-action-button"
                         title="Copy all"
                         aria-label="Copy all"
                         @click="$store.onscreenAgent.copyPromptHistoryAll()"
@@ -571,16 +501,7 @@
                       </button>
                       <button
                         type="button"
-                        class="secondary-button prompt-history-action-button"
-                        style="
-                          box-sizing: border-box;
-                          width: var(--prompt-history-action-width);
-                          min-width: var(--prompt-history-action-width);
-                          justify-content: center;
-                          gap: 0.32rem;
-                          padding-inline: 0.55rem;
-                          white-space: nowrap;
-                        "
+                        class="secondary-button dialog-action-button-fixed prompt-history-action-button"
                         @click="$store.onscreenAgent.closePromptHistoryDialog()"
                       >
                         <span>Close</span>

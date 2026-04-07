@@ -87,6 +87,11 @@
   overflow: hidden;
 }
 
+.agent-thread-surface .message-avatar-spacer {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .agent-thread-surface .message-avatar-user {
   background: var(--agent-thread-avatar-user-bg);
   color: var(--agent-thread-text-color);

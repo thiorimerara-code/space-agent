@@ -285,8 +285,6 @@ function buildPackingEntries(widgetIds = [], widgetSizes = {}) {
   });
 }
 
-const MIN_VERTICALITY_SCORE = 1.34;
-const MIN_VERTICALITY_ITEM_COUNT = 2;
 const PACKING_VIEWPORT_HEADROOM_COLS = 2;
 
 function sortPackingEntries(entries) {
@@ -349,129 +347,13 @@ function findPhysicallyFittingEntry(entries, position, widthThreshold, occupiedR
   return null;
 }
 
-function buildSameRowPreviewMetrics(entries, entry, position, widthThreshold, occupiedRects, placedPositions = {}, placedSizes = {}) {
-  const previewPositions = {
-    ...placedPositions,
-    [entry.widgetId]: position
-  };
-  const previewSizes = {
-    ...placedSizes,
-    [entry.widgetId]: entry.size
-  };
-  const previewOccupiedRects = [...occupiedRects, createRect(entry.widgetId, position, entry.size)];
-  const remainingEntries = sortPackingEntries(entries.filter((candidate) => candidate.widgetId !== entry.widgetId));
-
-  for (let col = position.col + 1; col < widthThreshold; col += 1) {
-    const previewPosition = {
-      col,
-      row: position.row
-    };
-
-    if (isScanCellOccupied(previewPosition, previewOccupiedRects)) {
-      continue;
-    }
-
-    const nextEntry = findPhysicallyFittingEntry(remainingEntries, previewPosition, widthThreshold, previewOccupiedRects);
-
-    if (!nextEntry) {
-      continue;
-    }
-
-    previewPositions[nextEntry.widgetId] = previewPosition;
-    previewSizes[nextEntry.widgetId] = nextEntry.size;
-    previewOccupiedRects.push(createRect(nextEntry.widgetId, previewPosition, nextEntry.size));
-    remainingEntries.splice(remainingEntries.indexOf(nextEntry), 1);
-  }
-
-  return computePackedMetrics(previewPositions, previewSizes);
-}
-
-function findLargestEntryForPosition(entries, position, widthThreshold, occupiedRects, placedPositions = {}, placedSizes = {}) {
-  const currentMetrics = computePackedMetrics(placedPositions, placedSizes);
-  let hasPhysicalFit = false;
-
-  for (const entry of entries) {
-    if ((position.col + entry.size.cols) > widthThreshold) {
-      continue;
-    }
-
-    if (!canPlaceRect(position, entry.size, occupiedRects)) {
-      continue;
-    }
-
-    hasPhysicalFit = true;
-
-    const nextMetrics = computePackedMetrics(
-      {
-        ...placedPositions,
-        [entry.widgetId]: position
-      },
-      {
-        ...placedSizes,
-        [entry.widgetId]: entry.size
-      }
-    );
-
-    if (!shouldPreferNextRow(currentMetrics, nextMetrics, position)) {
-      return {
-        entry,
-        preferNextRow: false
-      };
-    }
-
-    const sameRowPreviewMetrics = buildSameRowPreviewMetrics(
-      entries,
-      entry,
-      position,
-      widthThreshold,
-      occupiedRects,
-      placedPositions,
-      placedSizes
-    );
-
-    if (!shouldPreferNextRow(currentMetrics, sameRowPreviewMetrics, position)) {
-      return {
-        entry,
-        preferNextRow: false
-      };
-    }
-  }
-
-  return {
-    entry: null,
-    preferNextRow: hasPhysicalFit
-  };
-}
-
-function findNextRowStart(currentRow, occupiedRects) {
-  let nextRow = Math.max(0, Math.floor(currentRow) + 1);
-
-  while (isScanCellOccupied({ col: 0, row: nextRow }, occupiedRects)) {
-    nextRow += 1;
-  }
-
-  return nextRow;
-}
-
 function buildFirstFitPackedPositions(entries, widthThreshold, options = {}) {
   const occupiedRects = Array.isArray(options.occupiedRects) ? [...options.occupiedRects] : [];
   const positions = {};
   const remainingEntries = sortPackingEntries(entries);
-  const placedPositions =
-    options.placedPositions && typeof options.placedPositions === "object"
-      ? { ...options.placedPositions }
-      : {};
-  const placedSizes =
-    options.placedSizes && typeof options.placedSizes === "object"
-      ? Object.fromEntries(
-          Object.entries(options.placedSizes).map(([widgetId, size]) => [widgetId, normalizeWidgetSize(size, DEFAULT_WIDGET_SIZE)])
-        )
-      : {};
   let row = Number.isFinite(options.startRow) ? Math.max(0, Math.floor(options.startRow)) : 0;
 
   while (remainingEntries.length) {
-    let advanceRow = false;
-
     for (let col = 0; col < widthThreshold; col += 1) {
       const candidatePosition = {
         col,
@@ -482,34 +364,15 @@ function buildFirstFitPackedPositions(entries, widthThreshold, options = {}) {
         continue;
       }
 
-      const matchingEntry = findLargestEntryForPosition(
-        remainingEntries,
-        candidatePosition,
-        widthThreshold,
-        occupiedRects,
-        placedPositions,
-        placedSizes
-      );
+      const matchingEntry = findPhysicallyFittingEntry(remainingEntries, candidatePosition, widthThreshold, occupiedRects);
 
-      if (!matchingEntry.entry) {
-        if (matchingEntry.preferNextRow) {
-          advanceRow = true;
-          break;
-        }
-
+      if (!matchingEntry) {
         continue;
       }
 
-      positions[matchingEntry.entry.widgetId] = candidatePosition;
-      placedPositions[matchingEntry.entry.widgetId] = candidatePosition;
-      placedSizes[matchingEntry.entry.widgetId] = matchingEntry.entry.size;
-      occupiedRects.push(createRect(matchingEntry.entry.widgetId, candidatePosition, matchingEntry.entry.size));
-      remainingEntries.splice(remainingEntries.indexOf(matchingEntry.entry), 1);
-    }
-
-    if (advanceRow) {
-      row = findNextRowStart(row, occupiedRects);
-      continue;
+      positions[matchingEntry.widgetId] = candidatePosition;
+      occupiedRects.push(createRect(matchingEntry.widgetId, candidatePosition, matchingEntry.size));
+      remainingEntries.splice(remainingEntries.indexOf(matchingEntry), 1);
     }
 
     row += 1;
@@ -576,54 +439,6 @@ function computePackedBounds(positions, sizes) {
     height: bounds.maxRow - bounds.minRow,
     width: bounds.maxCol - bounds.minCol
   };
-}
-
-function computePackedMetrics(positions, sizes) {
-  const bounds = computePackedBounds(positions, sizes);
-  const widgetIds = Object.keys(positions || {});
-  const occupiedArea = widgetIds.reduce((sum, widgetId) => {
-    const size = normalizeWidgetSize(sizes?.[widgetId], DEFAULT_WIDGET_SIZE);
-    return sum + (size.cols * size.rows);
-  }, 0);
-  const totalArea = Math.max(1, bounds.width * bounds.height);
-  const fillRatio =
-    bounds.width > 0 && bounds.height > 0
-      ? Math.min(1, occupiedArea / totalArea)
-      : 1;
-  const verticalityRatio = bounds.width > 0 ? bounds.height / bounds.width : 1;
-
-  return {
-    ...bounds,
-    fillRatio,
-    itemCount: widgetIds.length,
-    occupiedArea,
-    verticalityRatio,
-    verticalityScore: verticalityRatio + fillRatio
-  };
-}
-
-function shouldPreferNextRow(currentMetrics, nextMetrics, position = DEFAULT_WIDGET_POSITION) {
-  if ((currentMetrics?.itemCount || 0) < MIN_VERTICALITY_ITEM_COUNT) {
-    return false;
-  }
-
-  // Only defer when placing later in the current scan row; once we move to a
-  // fresh row start, accept the best physical fit instead of cascading gaps.
-  if ((position?.col || 0) <= 0) {
-    return false;
-  }
-
-  // If the candidate stays inside the packed width we already established,
-  // treat it as a compact same-row fill instead of forcing a fresh row.
-  if ((nextMetrics?.width || 0) <= (currentMetrics?.width || 0)) {
-    return false;
-  }
-
-  if ((nextMetrics?.height || 0) >= (nextMetrics?.width || 0)) {
-    return false;
-  }
-
-  return (nextMetrics?.verticalityScore || 0) < MIN_VERTICALITY_SCORE;
 }
 
 function centerPackedPositions(positions, sizes) {
@@ -721,17 +536,7 @@ export function findFirstFitWidgetPlacement({
     ],
     widthThreshold,
     {
-      occupiedRects: buildOccupiedRects(normalizedExistingPositions, normalizedExistingSizes, originOffset),
-      placedPositions: Object.fromEntries(
-        Object.entries(normalizedExistingPositions).map(([widgetId, position]) => [
-          widgetId,
-          {
-            col: position.col - originOffset.col,
-            row: position.row - originOffset.row
-          }
-        ])
-      ),
-      placedSizes: normalizedExistingSizes
+      occupiedRects: buildOccupiedRects(normalizedExistingPositions, normalizedExistingSizes, originOffset)
     }
   );
   const localPosition = localPositions.__candidate__ || DEFAULT_WIDGET_POSITION;

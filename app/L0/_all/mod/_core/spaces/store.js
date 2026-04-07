@@ -847,35 +847,87 @@ function getChatTransientRuntime() {
   return transient && typeof transient.set === "function" ? transient : null;
 }
 
-function updateCurrentWidgetTransientSection({
+function buildCurrentWidgetTransientContent({
   spaceId = "",
   widgetId = "",
   widgetPath = "",
   widgetStatusText = "",
+  widgetHtml = "",
+  widgetHtmlAvailable = false,
+  widgetHtmlUnavailableReason = "",
   widgetText = ""
 } = {}) {
-  const transient = getChatTransientRuntime();
   const normalizedWidgetText = typeof widgetText === "string" ? widgetText.trim() : "";
 
-  if (!transient || !normalizedWidgetText) {
-    return false;
+  if (!normalizedWidgetText) {
+    return "";
   }
 
   const normalizedSpaceId = normalizeOptionalSpaceId(spaceId);
   const normalizedWidgetId =
     normalizeOptionalWidgetId(widgetId) || extractWidgetIdFromWidgetText(normalizedWidgetText);
+  const normalizedWidgetHtml = typeof widgetHtml === "string" ? widgetHtml.trim() : "";
+  const lines = [];
+
+  if (normalizedSpaceId) {
+    lines.push(`spaceId: ${normalizedSpaceId}`);
+  }
+
+  if (normalizedWidgetId) {
+    lines.push(`widgetId: ${normalizedWidgetId}`);
+  }
+
+  if (widgetPath) {
+    lines.push(`widgetPath: ${widgetPath}`);
+  }
+
+  if (widgetStatusText) {
+    lines.push(`status: ${widgetStatusText}`);
+  }
+
+  lines.push("", "rendered↓");
+
+  if (widgetHtmlAvailable) {
+    lines.push(normalizedWidgetHtml || "(empty)");
+  } else if (widgetHtmlUnavailableReason) {
+    lines.push(`(unavailable: ${widgetHtmlUnavailableReason})`);
+  } else {
+    lines.push("(unavailable)");
+  }
+
+  lines.push("", "source↓", normalizedWidgetText);
+
+  return lines.join("\n");
+}
+
+function updateCurrentWidgetTransientSection({
+  spaceId = "",
+  widgetId = "",
+  widgetPath = "",
+  widgetStatusText = "",
+  widgetHtml = "",
+  widgetHtmlAvailable = false,
+  widgetHtmlUnavailableReason = "",
+  widgetText = ""
+} = {}) {
+  const transient = getChatTransientRuntime();
+  const content = buildCurrentWidgetTransientContent({
+    spaceId,
+    widgetId,
+    widgetPath,
+    widgetStatusText,
+    widgetHtml,
+    widgetHtmlAvailable,
+    widgetHtmlUnavailableReason,
+    widgetText
+  });
+
+  if (!transient || !content) {
+    return false;
+  }
 
   transient.set(CURRENT_WIDGET_TRANSIENT_KEY, {
-    content: [
-      normalizedSpaceId ? `spaceId: ${normalizedSpaceId}` : "",
-      normalizedWidgetId ? `widgetId: ${normalizedWidgetId}` : "",
-      widgetPath ? `widgetPath: ${widgetPath}` : "",
-      widgetStatusText ? `status: ${widgetStatusText}` : "",
-      "",
-      normalizedWidgetText
-    ]
-      .filter(Boolean)
-      .join("\n"),
+    content,
     heading: "Current Widget",
     key: CURRENT_WIDGET_TRANSIENT_KEY,
     order: 300
@@ -926,16 +978,47 @@ function emitWidgetToolStatus(statusText, widgetRender = null) {
   return normalizedStatusText;
 }
 
-function buildWidgetReadToolStatusText({ widgetId = "", transientUpdated = false } = {}) {
+function emitWidgetReadToolResult(widgetText = "", widgetId = "") {
   const normalizedWidgetId = normalizeOptionalWidgetId(widgetId);
+  const statusText = normalizedWidgetId ? `Read widget "${normalizedWidgetId}".` : "Read current widget.";
 
-  if (normalizedWidgetId) {
-    return transientUpdated
-      ? `Widget "${normalizedWidgetId}" loaded to TRANSIENT.`
-      : `Widget "${normalizedWidgetId}" loaded.`;
+  console.log(`[spaces] ${statusText}`);
+  return typeof widgetText === "string" ? widgetText : "";
+}
+
+function emitWidgetSeeToolResult(widgetHtml = "", widgetId = "", full = false) {
+  const normalizedWidgetId = normalizeOptionalWidgetId(widgetId);
+  const statusText = normalizedWidgetId
+    ? `Captured ${full ? "full" : "stripped"} rendered HTML for widget "${normalizedWidgetId}".`
+    : `Captured ${full ? "full" : "stripped"} rendered HTML for the current widget.`;
+
+  console.log(`[spaces] ${statusText}`);
+  return typeof widgetHtml === "string" ? widgetHtml : "";
+}
+
+function readMountedWidgetHtmlEnvelope({ spaceId = "", widgetId = "", full = false, widgetRender = null } = {}) {
+  const normalizedSpaceId = normalizeOptionalSpaceId(spaceId);
+  const normalizedWidgetId = normalizeOptionalWidgetId(widgetId);
+  const activeSpaceId = normalizeOptionalSpaceId(activeSpacesStore?.currentSpaceId);
+
+  if (normalizedSpaceId && normalizedWidgetId && normalizedSpaceId === activeSpaceId) {
+    const widgetCard = activeSpacesStore?.widgetCards?.[normalizedWidgetId];
+
+    if (widgetCard?.renderTarget) {
+      return {
+        available: true,
+        html: buildWidgetInstanceHtmlResult(widgetCard.renderTarget.innerHTML, full),
+        unavailableReason: ""
+      };
+    }
   }
 
-  return transientUpdated ? "Current widget loaded to TRANSIENT." : "Current widget loaded.";
+  const check = widgetRender ? cloneWidgetRenderCheck(widgetRender, normalizedWidgetId) : null;
+  return {
+    available: false,
+    html: "",
+    unavailableReason: String(check?.message || "").trim() || "The current widget instance is not mounted."
+  };
 }
 
 async function buildWidgetToolResult(baseResult = {}, { operationLabel = "widget operation", spaceId = "", widgetId = "" } = {}) {
@@ -957,12 +1040,21 @@ async function buildWidgetToolResult(baseResult = {}, { operationLabel = "widget
   }
 
   const widgetRender = getWidgetRenderCheckForSpace(normalizedSpaceId, normalizedWidgetId);
+  const widgetView = readMountedWidgetHtmlEnvelope({
+    full: false,
+    spaceId: normalizedSpaceId,
+    widgetId: normalizedWidgetId,
+    widgetRender
+  });
   const widgetText = typeof nextResult.widgetText === "string" ? nextResult.widgetText : "";
   const transientUpdated = updateCurrentWidgetTransientSection({
     spaceId: normalizedSpaceId,
     widgetId: normalizedWidgetId,
     widgetPath,
     widgetStatusText: "",
+    widgetHtml: widgetView.html,
+    widgetHtmlAvailable: widgetView.available,
+    widgetHtmlUnavailableReason: widgetView.unavailableReason,
     widgetText
   });
   const widgetStatusText = formatWidgetOperationStatusText(normalizedWidgetId, operationLabel, widgetRender, {
@@ -975,6 +1067,9 @@ async function buildWidgetToolResult(baseResult = {}, { operationLabel = "widget
       widgetId: normalizedWidgetId,
       widgetPath,
       widgetStatusText,
+      widgetHtml: widgetView.html,
+      widgetHtmlAvailable: widgetView.available,
+      widgetHtmlUnavailableReason: widgetView.unavailableReason,
       widgetText
     });
   }
@@ -988,6 +1083,105 @@ function formatTitleFromId(id) {
     .filter(Boolean)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
+}
+
+function listReadableRuntimeWidgetChoices(spaceRecord) {
+  return normalizeRuntimeWidgetIdList(spaceRecord?.widgetIds).map((widgetId) => {
+    const widgetName = String(getWidgetRecord(spaceRecord, widgetId)?.name || formatTitleFromId(widgetId)).trim();
+    return widgetName && widgetName !== widgetId ? `${widgetId} (${widgetName})` : widgetId;
+  });
+}
+
+function resolveWidgetIdFromMountedSpace(spaceRecord, widgetName) {
+  const rawWidgetName = String(widgetName ?? "").trim();
+
+  if (!rawWidgetName) {
+    throw new Error("A widget name or id is required.");
+  }
+
+  const normalizedWidgetId = normalizeOptionalWidgetId(rawWidgetName);
+
+  if (normalizedWidgetId && getWidgetRecord(spaceRecord, normalizedWidgetId)) {
+    return normalizedWidgetId;
+  }
+
+  const normalizedWidgetName = rawWidgetName.toLocaleLowerCase();
+  const matchingWidgetIds = normalizeRuntimeWidgetIdList(spaceRecord?.widgetIds).filter((widgetId) => {
+    const displayName = String(getWidgetRecord(spaceRecord, widgetId)?.name || formatTitleFromId(widgetId)).trim();
+    return displayName.toLocaleLowerCase() === normalizedWidgetName;
+  });
+
+  if (matchingWidgetIds.length === 1) {
+    return matchingWidgetIds[0];
+  }
+
+  if (matchingWidgetIds.length > 1) {
+    throw new Error(
+      `Widget name "${rawWidgetName}" is ambiguous in space "${spaceRecord?.id || ""}". Matches: ${matchingWidgetIds
+        .map((widgetId) => {
+          const widgetName = String(getWidgetRecord(spaceRecord, widgetId)?.name || formatTitleFromId(widgetId)).trim();
+          return widgetName && widgetName !== widgetId ? `${widgetId} (${widgetName})` : widgetId;
+        })
+        .join(", ")}.`
+    );
+  }
+
+  const availableWidgets = listReadableRuntimeWidgetChoices(spaceRecord);
+  throw new Error(
+    `Widget "${rawWidgetName}" was not found in space "${spaceRecord?.id || ""}". Available widgets: ${
+      availableWidgets.length ? availableWidgets.join(", ") : "none"
+    }.`
+  );
+}
+
+function shouldStripWidgetHtmlAttribute(attributeName = "") {
+  const normalizedName = String(attributeName || "").trim().toLowerCase();
+
+  if (!normalizedName) {
+    return false;
+  }
+
+  return (
+    normalizedName === "class" ||
+    normalizedName === "id" ||
+    normalizedName === "part" ||
+    normalizedName === "role" ||
+    normalizedName === "slot" ||
+    normalizedName === "style" ||
+    normalizedName === "tabindex" ||
+    normalizedName.startsWith("@") ||
+    normalizedName.startsWith(":") ||
+    normalizedName.startsWith("aria-") ||
+    normalizedName.startsWith("data-") ||
+    normalizedName.startsWith("on") ||
+    normalizedName.startsWith("wire:") ||
+    normalizedName.startsWith("x-")
+  );
+}
+
+function buildWidgetInstanceHtmlResult(widgetHtml = "", full = false) {
+  const normalizedWidgetHtml = typeof widgetHtml === "string" ? widgetHtml.trim() : "";
+
+  if (full || !normalizedWidgetHtml) {
+    return normalizedWidgetHtml;
+  }
+
+  if (typeof document === "undefined" || typeof document.createElement !== "function") {
+    return normalizedWidgetHtml;
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = normalizedWidgetHtml;
+  template.content.querySelectorAll("link, meta, script, style").forEach((node) => node.remove());
+  template.content.querySelectorAll("*").forEach((element) => {
+    Array.from(element.attributes).forEach((attribute) => {
+      if (shouldStripWidgetHtmlAttribute(attribute.name)) {
+        element.removeAttribute(attribute.name);
+      }
+    });
+  });
+
+  return template.innerHTML.trim();
 }
 
 function isTruthyRouteParam(value) {
@@ -1255,32 +1449,26 @@ function createCurrentSpaceRuntime(namespace) {
           widgetName
         });
         const widgetId = extractWidgetIdFromWidgetText(widgetText) || normalizeOptionalWidgetId(widgetName);
-        const widgetPath = spaceId && widgetId ? buildSpaceWidgetFilePath(spaceId, widgetId) : "";
+        return emitWidgetReadToolResult(widgetText, widgetId);
+      })();
+    },
+    seeWidget(widgetName, full = false) {
+      return (async () => {
+        const currentRuntimeSpace = activeSpacesStore?.currentSpace;
 
-        const transientUpdated = updateCurrentWidgetTransientSection({
-          spaceId,
-          widgetId,
-          widgetPath,
-          widgetStatusText: "",
-          widgetText
-        });
-
-        const statusText = buildWidgetReadToolStatusText({
-          transientUpdated,
-          widgetId
-        });
-
-        if (transientUpdated) {
-          updateCurrentWidgetTransientSection({
-            spaceId,
-            widgetId,
-            widgetPath,
-            widgetStatusText: statusText,
-            widgetText
-          });
+        if (!currentRuntimeSpace) {
+          throw new Error("The spaces view is not currently mounted.");
         }
 
-        return emitWidgetToolStatus(statusText);
+        const widgetId = resolveWidgetIdFromMountedSpace(currentRuntimeSpace, widgetName);
+        const widgetCard = activeSpacesStore?.widgetCards?.[widgetId];
+
+        if (!widgetCard?.renderTarget) {
+          throw new Error(`Widget "${widgetId}" is not mounted in the current space.`);
+        }
+
+        const widgetHtml = buildWidgetInstanceHtmlResult(widgetCard.renderTarget.innerHTML, Boolean(full));
+        return emitWidgetSeeToolResult(widgetHtml, widgetId, Boolean(full));
       })();
     },
     patchWidget(widgetId, options = {}) {

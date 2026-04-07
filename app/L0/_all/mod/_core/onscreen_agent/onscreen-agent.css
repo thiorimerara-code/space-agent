@@ -806,6 +806,10 @@
   scroll-margin-block: 1rem;
 }
 
+.onscreen-agent-root .prompt-history-actions {
+  --dialog-action-button-width: 5.8rem;
+}
+
 .onscreen-agent-root .prompt-history-section.is-target {
   background:
     linear-gradient(180deg, rgba(148, 188, 255, 0.12), rgba(148, 188, 255, 0.04)),

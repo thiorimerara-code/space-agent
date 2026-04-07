@@ -11,7 +11,7 @@ Keep these files compact explicit and token-aware
 This scope owns:
 
 - `system-prompt.md`: firmware prompt for normal onscreen agent turns
-- `system-prompt.backup-before-012-open_goal_momentum-2026-04-06.md`: backup of the previous live firmware prompt before the current promotion
+- `system-prompt.backup-before-*.md`: backups of previous live firmware prompts before later promotions
 - `compact-prompt.md`: prompt for user-triggered history compaction
 - `compact-prompt-auto.md`: prompt for automatic loop compaction
 
@@ -41,10 +41,14 @@ This scope owns:
 - avoid concrete blocker examples that can over-anchor one domain behavior; prefer general rules when the concept is reusable
 - the ordered turn loop has already helped steer the agent toward correct execution-first behavior; prefer strengthening that loop over adding more fragmented local rules
 - prefer one explicit decision loop over scattered local rules when the same behavior can be expressed once in order
+- `system-prompt.md` should stay focused on overlay-wide protocol and runtime-generic execution behavior; module-specific helper names, staged workflows, and feature policy belong in owner-module always-loaded skills or owner-module `_core/onscreen_agent/...` prompt extensions instead of the base firmware prompt
 - prompt promotion requires both automated harness success and manual review of the nominal passes; raw leaderboard position alone is not enough
 - before replacing `system-prompt.md` with a promoted test variant, back up the previous live file in this folder and record the promotion source in docs
+- when several prompts hit the same strict matrix score, prefer the prompt with better full-suite repeat stability over the prompt with the newest one-shot clean run
+- as of 2026-04-07, the current live firmware prompt was promoted from `tests/agent_llm_performance/prompts/069A_handoff_no_copy.md` after the `070` through `075` sweep because it remained the best overall prompt on the 57-case suite: strongest one-shot score and best full-suite repeat stability among the finalists on `openai/gpt-5.4-mini`; the previous live prompt was backed up as `prompts/system-prompt.backup-before-069A-handoff-no-copy-2026-04-07.md`
 - both compaction prompts must require one plain-text block starting with `Conversation summary:`
 - when prompt file paths change, update `../llm.js` and `../AGENTS.md` in the same session
+- whenever these prompt files change, also update the matching docs under `app/L0/_all/mod/_core/documentation/docs/agent/`
 - whenever these prompt files change, measure token counts with the local tokenizer in the same session
 
 ## Development Guidance

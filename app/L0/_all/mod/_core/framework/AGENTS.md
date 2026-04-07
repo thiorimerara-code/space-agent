@@ -20,6 +20,7 @@ This module owns:
 - `js/moduleResolution.js`: propagation of `maxLayer` into framework-managed module and extension requests
 - `js/components.js`: `<x-component>` loading, recursive component imports, and `xAttrs(...)`
 - `js/AlpineStore.js`: store registration helper used by the runtime and legacy modules
+- `js/chat-messages.js`: shared chat-request message folding helpers that collapse consecutive `user` or `assistant` payload turns into alternating messages with blank-line joins
 - Alpine directives and magic helpers registered during bootstrap
 - shared browser API helpers in `js/api-client.js`, `js/api.js`, `js/fetch-proxy.js`, `js/download.js`, and `js/proxy-url.js`
 - small shared parsing and utility helpers such as markdown frontmatter, the browser YAML wrapper, and token counting
@@ -73,7 +74,8 @@ Important contracts:
 - `space.extend(...)` and `callJsExtensions("some/path", ...)` resolve JS hook files from `mod/<author>/<repo>/ext/js/<extension-point>/*.js` or `*.mjs`
 - extension callers should name only the seam; the runtime chooses the `html/` or `js/` subfolder implicitly
 - wrapped functions expose `/start` and `/end` hook points and become async
-- uncached extension lookups are batched to one `/api/extensions_load` request per frame
+- uncached HTML `<x-extension>` lookups are batched to one `/api/extensions_load` request per flush window; by default that window ends on the next animation frame, and frontend constant `HTML_EXTENSIONS_LOAD_BATCH_WAIT_MS` in `js/extensions.js` adds an extra wait window in milliseconds before the frame-aligned flush
+- JS hook lookups do not use that frame wait window; they request extension paths immediately because hook callers await them directly
 - empty extension lookups are cached as valid results
 - `moduleResolution.js` preserves page-level `maxLayer` for `/mod/...` and `/api/extensions_load` requests
 
@@ -103,4 +105,5 @@ Rules:
 - keep the external-fetch fallback cache runtime-local and in-memory; do not persist proxy-needed origins into storage or app files unless a user request explicitly adds that behavior
 - when updating the shared YAML package version or browser vendor copy, keep `js/yaml-lite.js` and `server/lib/utils/yaml_lite.js` aligned in the same session
 - when bootstrap, runtime namespaces, extension loading, or component loading change, also update `app/L0/_all/mod/_core/onscreen_agent/ext/skills/development/` because the onscreen development skill mirrors this module's contract
+- when bootstrap, runtime namespaces, extension loading, or component loading change, also update the matching docs under `app/L0/_all/mod/_core/documentation/docs/app/`
 - when changing bootstrap, runtime namespaces, extension loading, or component loading, update `/app/AGENTS.md` in the same session

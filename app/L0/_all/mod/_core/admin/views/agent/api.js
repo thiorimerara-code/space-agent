@@ -1,6 +1,7 @@
 import * as config from "/mod/_core/admin/views/agent/config.js";
 import { buildMessageContentForApi } from "/mod/_core/admin/views/agent/attachments.js";
 import * as llmParams from "/mod/_core/admin/views/agent/llm-params.js";
+import { mergeConsecutiveChatMessages } from "/mod/_core/framework/js/chat-messages.js";
 import * as proxyUrl from "/mod/_core/framework/js/proxy-url.js";
 
 function createHeaders(endpoint, apiKey) {
@@ -159,7 +160,7 @@ function createRequestBody(settings, systemPrompt, messages) {
     ...llmParams.parseAdminAgentParamsText(settings.paramsText || ""),
     model: settings.model || config.DEFAULT_ADMIN_CHAT_SETTINGS.model,
     stream: true,
-    messages: buildAdminAgentPromptMessages(systemPrompt, messages)
+    messages: mergeConsecutiveChatMessages(buildAdminAgentPromptMessages(systemPrompt, messages))
   };
 }
 

@@ -49,6 +49,7 @@ export function createAgentThreadView(config = {}) {
   const autoResizeMaxHeight = Number.isFinite(Number(config.autoResizeMaxHeight))
     ? Math.max(32, Math.round(Number(config.autoResizeMaxHeight)))
     : 120;
+  const groupConsecutiveAvatars = config.groupConsecutiveAvatars === true;
   const renderMarkdownWithMarked = config.renderMarkdownWithMarked === true;
   const assistantMarkdownClassName =
     typeof config.assistantMarkdownClassName === "string" ? config.assistantMarkdownClassName.trim() : "";
@@ -564,6 +565,16 @@ export function createAgentThreadView(config = {}) {
     return avatar;
   }
 
+  function createMessageAvatarSpacer(role) {
+    const avatar = document.createElement("div");
+    avatar.className =
+      role === "assistant"
+        ? "message-avatar message-avatar-agent message-avatar-spacer"
+        : "message-avatar message-avatar-user message-avatar-spacer";
+    avatar.setAttribute("aria-hidden", "true");
+    return avatar;
+  }
+
   function createAssistantMessageActionButton({ action, disabled = false, iconName, messageId, title }) {
     const button = document.createElement("button");
     button.type = "button";
@@ -580,17 +591,29 @@ export function createAgentThreadView(config = {}) {
     return button;
   }
 
-  function createMessageAccessory(role) {
+  function createMessageAccessory(role, options = {}) {
     const accessory = document.createElement("div");
     accessory.className = role === "assistant" ? "message-accessory" : "message-accessory message-accessory-user";
+
+    if (options.showAvatar === false) {
+      accessory.classList.add("is-avatar-continuation");
+      accessory.append(createMessageAvatarSpacer(role));
+      return accessory;
+    }
+
     accessory.append(createMessageAvatar(role));
     return accessory;
   }
 
-  function createMessageRow(role, bubble, extraClassName = "") {
+  function createMessageRow(role, bubble, extraClassName = "", options = {}) {
     const row = document.createElement("div");
     row.className = extraClassName ? `message-row ${role} ${extraClassName}` : `message-row ${role}`;
-    row.append(createMessageAccessory(role), bubble);
+
+    if (options.showAvatar === false) {
+      row.classList.add("is-avatar-continuation");
+    }
+
+    row.append(createMessageAccessory(role, options), bubble);
     return row;
   }
 
@@ -951,18 +974,25 @@ export function createAgentThreadView(config = {}) {
               {
                 executeDisplay,
                 message,
+                showAvatar: options.showAvatar !== false,
                 outputResults: null,
                 type: "execute"
               }
             ],
+            showAvatar: options.showAvatar !== false,
             type: "assistant-sequence"
           },
           options
         ),
-        "terminal-row"
+        "terminal-row",
+        {
+          showAvatar: options.showAvatar !== false
+        }
       );
     } else {
-      row = createMessageRow("assistant", createStandardMessageBubble(message));
+      row = createMessageRow("assistant", createStandardMessageBubble(message), "", {
+        showAvatar: options.showAvatar !== false
+      });
     }
 
     row.dataset.streamingMessageId = message.id;
@@ -1383,8 +1413,12 @@ export function createAgentThreadView(config = {}) {
       return "";
     }
 
+    const avatarSignature = group.showAvatar === false ? "avatar:continuation" : "avatar:lead";
+
     if (group.type === "assistant-sequence") {
-      return group.sections
+      return [
+        avatarSignature,
+        group.sections
         .map((section) => {
           if (section?.type === "execute") {
             return [
@@ -1397,17 +1431,19 @@ export function createAgentThreadView(config = {}) {
 
           return ["text", getMessageRenderSignature(section.message)].join("\u241f");
         })
-        .join("\u241e");
+        .join("\u241e")
+      ].join("\u241f");
     }
 
     if (group.type === "standalone-output") {
       return [
+        avatarSignature,
         group.messageId || "",
         getExecutionResultsRenderSignature(group.outputResults)
       ].join("\u241f");
     }
 
-    return getMessageRenderSignature(group.message);
+    return [avatarSignature, getMessageRenderSignature(group.message)].join("\u241f");
   }
 
   function setRowRenderState(row, group, options = {}) {
@@ -1417,6 +1453,7 @@ export function createAgentThreadView(config = {}) {
 
     row.__spaceThreadRenderKey = getGroupRenderKey(group);
     row.__spaceThreadRenderSignature = getGroupRenderSignature(group, options);
+    row.__spaceThreadShowAvatar = group?.showAvatar !== false;
     return row;
   }
 
@@ -1424,24 +1461,35 @@ export function createAgentThreadView(config = {}) {
     let row = null;
 
     if (group.type === "assistant-sequence") {
-      row = createMessageRow("assistant", createAssistantSequenceBubble(group, options), "terminal-row");
+      row = createMessageRow("assistant", createAssistantSequenceBubble(group, options), "terminal-row", {
+        showAvatar: group.showAvatar !== false
+      });
     } else if (group.type === "standalone-output") {
       row = createMessageRow(
         "assistant",
         createStandaloneExecutionOutputBubble(group.outputResults, group.messageId),
-        "terminal-row execution-output-row"
+        "terminal-row execution-output-row",
+        {
+          showAvatar: group.showAvatar !== false
+        }
       );
     } else if (group.message.role === "assistant" && group.message.streaming) {
-      row = createStreamingAssistantRow(group.message, options);
+      row = createStreamingAssistantRow(group.message, {
+        ...options,
+        showAvatar: group.showAvatar !== false
+      });
     } else {
-      row = createMessageRow(group.message.role, createStandardMessageBubble(group.message));
+      row = createMessageRow(group.message.role, createStandardMessageBubble(group.message), "", {
+        showAvatar: group.showAvatar !== false
+      });
     }
 
     return setRowRenderState(row, group, options);
   }
 
-  function buildStreamingRenderGroup(message) {
+  function buildStreamingRenderGroup(message, options = {}) {
     const executeDisplay = parseExecuteDisplayContent(message?.content);
+    const showAvatar = options.showAvatar !== false;
 
     if (executeDisplay) {
       return {
@@ -1449,18 +1497,56 @@ export function createAgentThreadView(config = {}) {
           {
             executeDisplay,
             message,
+            showAvatar,
             outputResults: null,
             type: "execute"
           }
         ],
+        showAvatar,
         type: "assistant-sequence"
       };
     }
 
     return {
       message,
+      showAvatar,
       type: "standard"
     };
+  }
+
+  function getGroupSpeakerRole(group) {
+    if (!group || typeof group !== "object") {
+      return "";
+    }
+
+    if (group.type === "assistant-sequence" || group.type === "standalone-output") {
+      return "assistant";
+    }
+
+    return typeof group.message?.role === "string" ? group.message.role : "";
+  }
+
+  function applyAvatarGrouping(groups) {
+    if (!Array.isArray(groups) || !groups.length) {
+      return [];
+    }
+
+    let previousSpeakerRole = "";
+
+    return groups.map((group) => {
+      const speakerRole = getGroupSpeakerRole(group);
+      const showAvatar = !groupConsecutiveAvatars || !speakerRole || speakerRole !== previousSpeakerRole;
+
+      if (speakerRole) {
+        previousSpeakerRole = speakerRole;
+      }
+
+      return {
+        ...group,
+        showAvatar,
+        speakerRole
+      };
+    });
   }
 
   function renderMessages(thread, history, options = {}) {
@@ -1470,7 +1556,7 @@ export function createAgentThreadView(config = {}) {
 
     const queuedMessages = Array.isArray(options.queuedMessages) ? options.queuedMessages : [];
     const renderedMessages = queuedMessages.length ? [...history, ...queuedMessages] : history;
-    const groups = renderedMessages.length ? buildMessageDisplayGroups(renderedMessages, options) : [];
+    const groups = renderedMessages.length ? applyAvatarGrouping(buildMessageDisplayGroups(renderedMessages, options)) : [];
 
     if (!groups.length && thread.classList.contains("is-empty")) {
       return;
@@ -1549,6 +1635,7 @@ export function createAgentThreadView(config = {}) {
     const stickyBottom = Boolean(scroller) && isNearBottom(scroller);
     const row = thread.querySelector(`[data-streaming-message-id="${message.id}"]`);
     const executeDisplay = parseExecuteDisplayContent(message.content);
+    const showAvatar = row?.__spaceThreadShowAvatar !== false;
 
     if (!row) {
       return false;
@@ -1562,7 +1649,13 @@ export function createAgentThreadView(config = {}) {
       }
 
       textBlock.textContent = message.content || "Streaming...";
-      setRowRenderState(row, buildStreamingRenderGroup(message), options);
+      setRowRenderState(
+        row,
+        buildStreamingRenderGroup(message, {
+          showAvatar
+        }),
+        options
+      );
 
       if (stickyBottom && scroller) {
         scroller.scrollTop = getMaxScrollTop(scroller);
@@ -1574,8 +1667,17 @@ export function createAgentThreadView(config = {}) {
     if (!patchStreamingExecutionRow(row, message)) {
       const existingExecutionCard = row.querySelector("[data-execution-card]");
       const wasOpen = existingExecutionCard?.open === true;
-      const nextRow = createStreamingAssistantRow(message, options);
-      setRowRenderState(nextRow, buildStreamingRenderGroup(message), options);
+      const nextRow = createStreamingAssistantRow(message, {
+        ...options,
+        showAvatar
+      });
+      setRowRenderState(
+        nextRow,
+        buildStreamingRenderGroup(message, {
+          showAvatar
+        }),
+        options
+      );
 
       if (wasOpen) {
         const nextExecutionCard = nextRow.querySelector("[data-execution-card]");
@@ -1587,7 +1689,13 @@ export function createAgentThreadView(config = {}) {
 
       row.replaceWith(nextRow);
     } else {
-      setRowRenderState(row, buildStreamingRenderGroup(message), options);
+      setRowRenderState(
+        row,
+        buildStreamingRenderGroup(message, {
+          showAvatar
+        }),
+        options
+      );
     }
 
     if (stickyBottom && scroller) {

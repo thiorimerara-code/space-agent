@@ -16,6 +16,7 @@ main helpers
 Current space:
 - listWidgets()
 - readWidget(id)
+- seeWidget(id, full=false)
 - patchWidget(id, { name?, cols?, rows?, col?, row?, edits? })
 - renderWidget({ id, name, cols, rows, renderer })
 - reloadWidget(id)
@@ -34,9 +35,18 @@ example|Example|expanded, 4x3 widget
 - That catalog is plain text, not JSON. Do not expect widgets, items, or other object fields from it
 - If the user already named the target widget clearly, for example snake, tetris, or minesweeper, do not ask which widget. Read that widget directly by id or display name
 - On the next turn, read the visible id row directly, for example `snake-game|Snake|...` means use `readWidget("snake-game")`
-- Use that id for readWidget(), patchWidget(), and reloadWidget(). Name is fallback only
-- readWidget() returns a short status and loads Current Widget into _____transient
-- Current Widget format↓
+- Use that id for readWidget(), seeWidget(), patchWidget(), and reloadWidget(). Name is fallback only
+- readWidget() returns the numbered source directly in `_____framework result↓`
+- seeWidget() returns the current rendered widget HTML directly in `_____framework result↓`
+- `seeWidget(id)` strips script/style tags, inline handlers, class lists, ids, and data attrs by default
+- Use `seeWidget(id, true)` only when you explicitly need the full live innerHTML
+- Current Widget transient appears after patchWidget(), renderWidget(), or reloadWidget()
+- That transient is one envelope with `rendered↓` for stripped live HTML and `source↓` for the numbered readback
+- Current Widget format after a write or reload↓
+rendered↓
+<div>Hello</div>
+
+source↓
 id: example
 name: Example
 cols: 4
@@ -45,15 +55,15 @@ renderer↓
 0 async (parent, currentSpace) => {
 1   console.log("hello");
 2 }
-- Patch numbers come only from numbered renderer lines after renderer↓
+- Patch numbers come only from numbered renderer lines after renderer↓ inside source↓
 - Do not copy displayed line numbers into patch content
 - In prepared input, optional example turns may appear before live history, _____user = human, _____framework = runtime output, and _____transient = trailing Current Widget context
 
 staged turns
-- listWidgets() and readWidget() are discovery calls. If the next step depends on them, end the execution there
+- listWidgets(), readWidget(), and seeWidget() are discovery calls. If the next step depends on them, end the execution there
 - If _____framework already showed the widget id you need, skip another discovery call and move to the next step
-- After readWidget(), patch on the next turn, not in the same JS block
-- After patchWidget(), renderWidget(), or reloadWidget(), use the refreshed Current Widget on the next turn if another edit is needed
+- After readWidget() or seeWidget(), patch on the next turn, not in the same JS block
+- After patchWidget(), renderWidget(), or reloadWidget(), use the refreshed Current Widget on the next turn if another edit is needed: `rendered↓` for what mounted and `source↓` for the next patch
 - Start every execution block with one short sentence saying the immediate step
 - Put that sentence on its own line. Then put _____javascript alone on the next line
 - Do not execute silently
@@ -67,15 +77,19 @@ Checking widget catalog
 _____javascript
 return await space.current.listWidgets()
 
-Loading the widget source into transient
+Reading the widget source
 _____javascript
 return await space.current.readWidget("tetris-game")
 
-After the catalog already showed snake-game, loading Snake source
+Seeing the current rendered widget HTML
+_____javascript
+return await space.current.seeWidget("tetris-game")
+
+After the catalog already showed snake-game, reading Snake source
 _____javascript
 return await space.current.readWidget("snake-game")
 
-User asked for the snake widget, loading it directly
+User asked for the snake widget, reading it directly
 _____javascript
 return await space.current.readWidget("snake")
 
@@ -94,6 +108,10 @@ const widgets = await space.current.listWidgets();
 const snake = widgets.widgets.find(...)
 
 bad
+return await space.current.readWidget("snake-game")
+return await space.current.patchWidget("snake-game", ...)
+
+bad
 return await space.current.patchWidget("snake-game", ...)
 // success came back
 return await space.current.patchWidget("snake-game", ...)
@@ -107,25 +125,46 @@ patch vs rewrite
 - Use renderWidget() for new widgets or full rewrites
 - patchWidget() is not a whole-renderer rewrite API. Do not use broad guesses like 0-999
 - Use name, cols, rows, col, row for metadata changes. Use edits only for renderer lines
-- edits use raw JS only: [{ from, to?, content? }]
+- Preferred small-edit shape: [{ find, replace? }]
+- find must be one exact unique snippet copied from readWidget() output or from Current Widget `source↓`
+- Omit replace on a find edit to delete that snippet
+- Line-edit shape also works: [{ from, to?, content? }]
 - from and to are inclusive zero-based renderer line numbers
 - Omit to to insert before from
-- Omit content on a ranged edit to delete
+- Omit content on a ranged line edit to delete
+- Common line aliases like line, startLine/endLine, range, text, and replace are tolerated, but prefer the canonical shapes above
+- Do not mix exact find edits and line edits in the same call
 - Do not overlap edits
 - The runtime applies edits from higher line numbers down to lower ones
-- If you build edits programmatically, parse the numbered renderer lines. Do not use widget.split("\n") array indexes as patch coordinates
+- If you build edits programmatically, parse the numbered renderer lines from readWidget() output or Current Widget `source↓`. Do not use widget.split("\n") array indexes as patch coordinates
 - If patchWidget() or renderWidget() says No files were written, the old widget file is still the source of truth. Fix and retry
 
+example exact snippet patch
+_____javascript
+return await space.current.patchWidget("snake-game", {
+  edits: [
+    {
+      find: "parent.style.background = '#6f8f54';",
+      replace: "parent.style.background = '#5f7f3f';"
+    }
+  ]
+})
+
 write and reload behavior
-- readWidget(), patchWidget(), renderWidget(), and reloadWidget() return short status strings only
-- They also emit plain-text console status
-- Do not parse those status strings. The execution output is enough
-- If a write or reload reports a render failure, keep fixing the widget from Current Widget before claiming success
+- readWidget() returns the numbered source readback
+- seeWidget() returns rendered HTML
+- patchWidget(), renderWidget(), and reloadWidget() return short status strings and refresh Current Widget in _____transient with both `rendered↓` and `source↓`
+- Helpers also emit plain-text console status
+- Do not parse status strings. The execution output is enough
+- If a write or reload reports a render failure, keep fixing the widget from Current Widget `source↓` before claiming success
 - Use reloadWidget(id) when you want an explicit rerun without changing source
 
 renderer rules
 - Prefer async (parent, currentSpace) => { ... }
 - Render into parent
+- Do not add outer wrapper padding just to inset content. The widget shell already provides that spacing
+- Default widget card surface is `#101b2d` (`rgba(16, 27, 45, 0.92)`). Do not add another full-card background unless the content truly needs its own stage
+- Use light text and UI elements by default because widgets sit on that dark surface
 - For markdown-heavy output, use space.utils.markdown.render(text, parent)
 - Max widget size is 24x24
 - Pick a reasonable size. Do not default to oversized cards
@@ -136,5 +175,6 @@ renderer rules
 flow
 1. listWidgets() if you need the live catalog
 2. readWidget(id) for any existing widget you will change
-3. Next turn: patchWidget(id, ...) or renderWidget(...)
-4. Next turn if needed: use the refreshed Current Widget, then continue
+3. seeWidget(id) only when you need the live rendered DOM rather than source
+4. Next turn: patchWidget(id, ...) or renderWidget(...)
+5. Next turn if needed: use the refreshed Current Widget, then continue

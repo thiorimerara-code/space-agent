@@ -31,6 +31,7 @@ This scope owns:
 - the harness retry policy must stay explicit in `config.yaml`; current parallel runs use request retries with backoff instead of aborting the whole matrix on the first transport miss
 - the harness must not execute assistant `_____javascript`; it only evaluates assistant outputs against case criteria
 - every evaluated assistant reply must include exactly one turn marker: `_____javascript` for execution turns or `_____terminate` for terminal turns
+- marker tokens must be matched exactly as written, including all five leading underscores
 - terminal-style replies must end with the exact `_____terminate` suffix
 - thrust-style cases should require syntactically valid javascript after `_____javascript` when the agent is expected to execute
 - matrix runs must execute cases in parallel for each prompt unless concurrency is intentionally capped by config or CLI

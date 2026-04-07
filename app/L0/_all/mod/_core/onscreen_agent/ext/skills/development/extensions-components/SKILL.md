@@ -28,6 +28,7 @@ Example:
 - JS hook files live at `mod/<author>/<repo>/ext/js/<extension-point>/*.js` or `*.mjs`.
 - The runtime resolves `/start` and `/end` hooks around the wrapped function automatically.
 - `space.extend()` requires a valid module ref and a standalone named function or explicit extension point name.
+- If a feature needs onscreen-agent-specific prompt shaping or execution validation for its own helpers, add an `ext/js/_core/onscreen_agent/...` hook from that feature instead of editing `_core/onscreen_agent` directly.
 
 ## Component Loader Rules
 
@@ -43,6 +44,8 @@ Example:
 - Different filenames under the same extension point compose together.
 - Prefer additive composition before exact-path replacement.
 - `maxLayer` constrains module and extension resolution but not logical app-file paths.
+- Uncached HTML `<x-extension>` lookups batch before they call `/api/extensions_load`; the default flush is the next animation frame, and frontend constant `HTML_EXTENSIONS_LOAD_BATCH_WAIT_MS` in `app/L0/_all/mod/_core/framework/js/extensions.js` adds an extra wait window in milliseconds before that frame-aligned flush.
+- JS hook lookups do not use that wait window; they resolve immediately because hook callers await them directly.
 
 ## Practical Guidance
 

@@ -57,6 +57,8 @@ const MODULE_PATH_PATTERN = /\/mod\/([^/]+)\/([^/]+)\/(.+)$/u;
 const JS_CACHE_AREA = "frontend_extensions_js(extensions)";
 const HTML_CACHE_AREA = "frontend_extensions_html(extensions)";
 const EXTENSION_BATCH_FALLBACK_MS = 32;
+// Frontend-only extra wait window before an uncached HTML x-extension lookup batch flushes.
+const HTML_EXTENSIONS_LOAD_BATCH_WAIT_MS = 0;
 const HTML_EXTENSION_SCOPE = "html";
 const JS_EXTENSION_SCOPE = "js";
 
@@ -355,6 +357,7 @@ const pendingExtensionLookups = new Map();
 const queuedExtensionLookups = new Map();
 
 let queuedExtensionFrameHandle = null;
+let queuedExtensionWaitHandle = null;
 let queuedExtensionTimeoutHandle = null;
 
 function clearExtensionLookupSchedule() {
@@ -366,6 +369,12 @@ function clearExtensionLookupSchedule() {
   }
 
   queuedExtensionFrameHandle = null;
+
+  if (queuedExtensionWaitHandle != null) {
+    clearTimeout(queuedExtensionWaitHandle);
+  }
+
+  queuedExtensionWaitHandle = null;
 
   if (queuedExtensionTimeoutHandle != null) {
     clearTimeout(queuedExtensionTimeoutHandle);
@@ -417,29 +426,90 @@ async function flushQueuedExtensionLookups() {
   }
 }
 
-function scheduleExtensionLookupFlush() {
+function normalizeExtensionLookupResponse(results, key) {
+  return Array.isArray(results?.[key])
+    ? results[key].filter((path) => typeof path === "string")
+    : [];
+}
+
+async function requestExtensionLookupPaths(key, patterns) {
+  const maxLayer = getConfiguredModuleMaxLayer();
+  /** @type {LoadExtensionsBatchResponse | null} */
+  const response = await api.callJsonApi(`/api/extensions_load`, {
+    ...(maxLayer === null ? {} : { maxLayer }),
+    requests: [
+      {
+        key,
+        patterns
+      }
+    ]
+  });
+
+  const results =
+    response && typeof response === "object" && response.results &&
+    typeof response.results === "object"
+      ? response.results
+      : Object.create(null);
+
+  return normalizeExtensionLookupResponse(results, key);
+}
+
+function runScheduledExtensionLookupFlush() {
+  clearExtensionLookupSchedule();
+  void flushQueuedExtensionLookups();
+}
+
+function scheduleFrameAwareExtensionLookupFlush() {
   if (queuedExtensionFrameHandle != null || queuedExtensionTimeoutHandle != null) {
     return;
   }
 
-  const runFlush = () => {
-    clearExtensionLookupSchedule();
-    void flushQueuedExtensionLookups();
-  };
-
   if (typeof globalThis.requestAnimationFrame === "function") {
-    queuedExtensionFrameHandle = globalThis.requestAnimationFrame(runFlush);
+    queuedExtensionFrameHandle = globalThis.requestAnimationFrame(
+      runScheduledExtensionLookupFlush
+    );
   }
 
   if (typeof globalThis.setTimeout === "function") {
     queuedExtensionTimeoutHandle = globalThis.setTimeout(
-      runFlush,
+      runScheduledExtensionLookupFlush,
       EXTENSION_BATCH_FALLBACK_MS
     );
     return;
   }
 
-  queueMicrotask(runFlush);
+  queueMicrotask(runScheduledExtensionLookupFlush);
+}
+
+function scheduleExtensionLookupFlush() {
+  if (
+    queuedExtensionFrameHandle != null ||
+    queuedExtensionWaitHandle != null ||
+    queuedExtensionTimeoutHandle != null
+  ) {
+    return;
+  }
+
+  const batchWaitMs =
+    Number.isFinite(HTML_EXTENSIONS_LOAD_BATCH_WAIT_MS) &&
+    HTML_EXTENSIONS_LOAD_BATCH_WAIT_MS > 0
+      ? HTML_EXTENSIONS_LOAD_BATCH_WAIT_MS
+      : 0;
+  if (batchWaitMs > 0 && typeof globalThis.setTimeout === "function") {
+    queuedExtensionWaitHandle = globalThis.setTimeout(() => {
+      queuedExtensionWaitHandle = null;
+
+      if (typeof globalThis.requestAnimationFrame === "function") {
+        scheduleFrameAwareExtensionLookupFlush();
+        return;
+      }
+
+      runScheduledExtensionLookupFlush();
+    }, batchWaitMs);
+    return;
+  }
+
+  scheduleFrameAwareExtensionLookupFlush();
 }
 
 function loadExtensionPaths(extensionPoint, filters, scope) {
@@ -453,6 +523,15 @@ function loadExtensionPaths(extensionPoint, filters, scope) {
   const pendingLookup = pendingExtensionLookups.get(lookupKey);
   if (pendingLookup) {
     return pendingLookup;
+  }
+
+  if (scope !== HTML_EXTENSION_SCOPE) {
+    const lookupPromise = requestExtensionLookupPaths(lookupKey, patterns)
+      .finally(() => {
+        pendingExtensionLookups.delete(lookupKey);
+      });
+    pendingExtensionLookups.set(lookupKey, lookupPromise);
+    return lookupPromise;
   }
 
   const lookupPromise = new Promise((resolve, reject) => {

@@ -8,7 +8,7 @@ Keep agent orchestration, prompt construction, tool flow, state management, user
 
 This is one of the five core docs. It owns app-wide architecture, composition rules, and development principles. Detailed module behavior belongs in deeper module-local docs.
 
-Documentation is top priority for this area. After any change under `app/` or any app-facing contract change owned here, update this file and the closest owning module `AGENTS.md` files in the same session before finishing.
+Documentation is top priority for this area. After any change under `app/` or any app-facing contract change owned here, update this file, the closest owning module `AGENTS.md` files, and the relevant supplemental docs under `_core/documentation/docs/` in the same session before finishing.
 
 ## Documentation Hierarchy
 
@@ -18,10 +18,13 @@ Current module-local docs in the app tree:
 
 - `app/L0/_all/mod/_core/dashboard/AGENTS.md`
 - `app/L0/_all/mod/_core/dashboard_welcome/AGENTS.md`
+- `app/L0/_all/mod/_core/documentation/AGENTS.md`
 - `app/L0/_all/mod/_core/framework/AGENTS.md`
 - `app/L0/_all/mod/_core/router/AGENTS.md`
+- `app/L0/_all/mod/_core/skillset/AGENTS.md`
 - `app/L0/_all/mod/_core/spaces/AGENTS.md`
 - `app/L0/_all/mod/_core/visual/AGENTS.md`
+- `app/L0/_all/mod/_core/webllm/AGENTS.md`
 - `app/L0/_all/mod/_core/admin/AGENTS.md`
 - `app/L0/_all/mod/_core/admin/views/agent/AGENTS.md`
 - `app/L0/_all/mod/_core/admin/views/files/AGENTS.md`
@@ -92,8 +95,11 @@ Current major first-party modules under `app/L0/_all/mod/_core/`:
 - `visual/`: shared visual language, canvas, chrome, buttons, dialog helpers, and conversation rendering primitives
 - `router/`: root routed shell for the authenticated app; route-level frame width, height or scroll policy, and other shell-owned layout overrides belong here rather than in feature modules, but routed pages own their own content padding
 - `admin/`: firmware-backed admin shell and panels
+- `documentation/`: supplemental agent-facing documentation docs, the focused-read documentation helper, and the documentation skill that carries the top-level docs map
 - `onscreen_agent/`: floating routed overlay agent and the first-party user-facing agent surface
 - `onscreen_menu/`: top-right routed shell menu extension
+- `skillset/`: first-party reusable onscreen skill packs plus browser helper scripts that those skills import through stable `/mod/...` paths
+- `webllm/`: routed browser-only WebLLM test surface with a module-local worker, vendored browser runtime, compact searchable prebuilt model loading, expert-only compiled custom model loading, and simple throughput reporting
 - `dashboard/`, `dashboard_welcome/`, `spaces/`, and the `space/` compatibility shim: current routed feature surfaces and dashboard-injected surfaces under the router
 
 ## Layer Rules And Module Model
@@ -111,6 +117,8 @@ Current major first-party modules under `app/L0/_all/mod/_core/`:
 - each group or user owns a `mod/` folder, and module contents are namespaced as `mod/<author>/<repo>/...`
 - browser-facing code and assets should normally be delivered through `/mod/...`
 - group-scoped onscreen skill packs may live under readable layer roots such as `L0/_admin/mod/.../ext/skills/`; visibility follows the same readable-root permission model as app-file discovery, and each skill file is named `SKILL.md`
+- when a skill needs reusable browser logic, keep that logic in a small module-local JS file and import it from the skill via a stable `/mod/<author>/<repo>/...` path instead of pasting long scripts into `SKILL.md`
+- when a stable frontend contract or workflow changes, update the relevant narrative docs under `app/L0/_all/mod/_core/documentation/docs/` alongside the owning `AGENTS.md` files
 - page shells may clamp module and extension resolution with `meta[name="space-max-layer"]`; the current admin shell sets `0`
 - page shells may also receive injected `meta[name="space-config"]` tags for runtime parameters marked `frontend_exposed`
 - authenticated app-file APIs operate on logical app-rooted paths such as `L2/alice/user.yaml` or `/app/L2/alice/user.yaml`, and supported APIs may use `~` or `~/...` as shorthand for the authenticated user's `L2/<username>/...`
@@ -161,10 +169,13 @@ JS extension hooks:
 - JS hook files live at `mod/<author>/<repo>/ext/js/<extension-point>/*.js` or `*.mjs`
 - JS callers name only the seam; the runtime loads hooks from the module's `ext/js/` tree automatically
 - use `callJsExtensions("name", data)` only when the seam is an explicit event rather than a function lifecycle
+- when a feature module needs onscreen-agent prompt shaping, execution-plan validation, or other module-specific chat behavior for its own helpers, add an `ext/js/_core/onscreen_agent/...` hook from the owning module; do not hardcode feature-specific policy into `_core/onscreen_agent`
 
 Resolution and overrides:
 
 - `/api/extensions_load` resolves extension files from the accessible `L0 -> L1 -> L2` inheritance chain
+- uncached HTML `<x-extension>` lookups batch until the next animation frame by default; frontend constant `HTML_EXTENSIONS_LOAD_BATCH_WAIT_MS` in `app/L0/_all/mod/_core/framework/js/extensions.js` adds an extra wait window before that frame-aligned flush
+- JS extension hooks do not use that wait window; their lookup requests go out immediately because the wrapped calls await them directly
 - `maxLayer` constrains only module and extension resolution
 - identical module-relative extension file paths override lower-ranked layers
 - different filenames under the same extension point compose together
@@ -202,7 +213,7 @@ Runtime guidance:
 - `globalThis.space` is scoped to the current window or iframe only; do not publish it into other browsing contexts
 - use `space.api` for authenticated backend calls
 - use `space.api.folderDownloadUrl(...)` when a folder download should stay as a browser attachment instead of fetching the archive blob into frontend memory
-- keep feature-owned runtime namespaces under `space` explicit and narrow; `_core/spaces` owns `space.current` for current-space widget authoring, compact widget catalog discovery, widget-definition reads that expose plain metadata plus numbered renderer lines, widget patch helpers, explicit widget reload checks, compact widget write results, live widget-state descriptors including render health, and batch layout or toggle or removal helpers plus `space.spaces` for persisted space CRUD, loaded-space collections, lower-level widget or folder-copy duplication or storage helpers, and spaces-owned prompt context injection that is limited to current-space agent instructions while widget workflow guidance and catalog discovery stay tool-driven, `_core/onscreen_agent` owns `space.onscreenAgent` for overlay display control and prompt submission, and agent surfaces publish the active thread snapshot at `space.chat`, including the non-persisted `space.chat.transient` registry for mutable prompt context blocks plus a prepared-prompt contract where system prompt text comes first, optional example user or assistant messages follow before live history, real human user turns are framed as `_____user`, framework-generated follow-up turns are framed as `_____framework`, and mutable runtime context is emitted as a separate trailing `_____transient` message
+- keep feature-owned runtime namespaces under `space` explicit and narrow; `_core/spaces` owns `space.current` for current-space widget authoring, compact widget catalog discovery, widget-definition reads that expose plain metadata plus numbered renderer lines directly in the response, live rendered-widget HTML inspection through `seeWidget(...)`, widget patch helpers, explicit widget reload checks, compact widget write results, post-write transient envelopes that carry both stripped rendered HTML and numbered source readback, live widget-state descriptors including render health, and batch layout or toggle or removal helpers plus `space.spaces` for persisted space CRUD, loaded-space collections, lower-level widget or folder-copy duplication or storage helpers, and spaces-owned prompt context injection that is limited to current-space agent instructions while widget workflow guidance and catalog discovery stay tool-driven, `_core/onscreen_agent` owns `space.onscreenAgent` for overlay display control and prompt submission, and agent surfaces publish the active thread snapshot at `space.chat`, including the non-persisted `space.chat.transient` registry for mutable prompt context blocks plus a prepared-prompt contract where system prompt text comes first, optional example user or assistant messages follow before live history, real human user turns are framed as `_____user`, framework-generated follow-up turns are framed as `_____framework`, and mutable runtime context is emitted as a separate trailing `_____transient` message
 - shared visual helpers may publish small reusable UI entry points under `space.visual`; the current shared selector contract is `_core/visual/icons/icon-color-selector.js`, which registers `space.visual.openIconColorSelector(options)` after that module is imported
 - use `space.api.userSelfInfo()` as the canonical browser-side identity snapshot; it returns `{ username, fullName, groups, managedGroups }`, and frontend code should derive writable app roots from that data plus the standard layer rules
 - use `space.config` for frontend reads of backend parameters that were explicitly marked `frontend_exposed`
@@ -219,6 +230,7 @@ Space Agent frontend work should look like one deliberate system rather than a m
 - use the semantic color tokens from `app/L0/_all/mod/_core/framework/css/colors.css`
 - use the shared visual system in `app/L0/_all/mod/_core/visual/` before inventing feature-local backgrounds, buttons, dialogs, or menus
 - modal chrome should stay compact and understated across the app; prefer the shared flatter dialog-button treatment over oversized pill buttons or feature-local modal button restyling
+- when a modal has long content plus footer actions, keep the header and footer outside the scroll area and reuse the shared `_core/visual/forms/dialog.css` shell classes instead of making the whole dialog card scroll
 - keep the dark space direction calm and readable; avoid noisy sci-fi chrome and neon overload
 - if a style pattern appears in more than one place, move it into `_core/visual`
 - public shells that cannot load authenticated `/mod/...` assets should keep mirrored local assets aligned with the shared system rather than re-inventing a second design language
@@ -242,7 +254,9 @@ Detailed visual subsystem rules now live in `app/L0/_all/mod/_core/visual/AGENTS
 - `router/` owns the authenticated app shell, routing, and routed extension anchors; see `app/L0/_all/mod/_core/router/AGENTS.md`
 - `dashboard/` owns the routed dashboard shell and its dashboard-local extension seam; see `app/L0/_all/mod/_core/dashboard/AGENTS.md`
 - `dashboard_welcome/` owns the dismissible dashboard welcome panel and bundled demo spaces; see `app/L0/_all/mod/_core/dashboard_welcome/AGENTS.md`
+- `documentation/` owns the supplemental documentation tree, the documentation skill that carries its compact docs map, and the focused docs helper used by the onscreen agent; see `app/L0/_all/mod/_core/documentation/AGENTS.md`
 - `visual/` owns the shared visual system, reusable presentation primitives, and shared icon-selection modal helpers; see `app/L0/_all/mod/_core/visual/AGENTS.md`
+- `webllm/` owns the routed WebLLM browser-inference test surface, its route-local worker, and its vendored WebLLM browser runtime; see `app/L0/_all/mod/_core/webllm/AGENTS.md`
 - `admin/` owns the firmware-backed admin shell, panels, and admin-specific skills/runtime glue; see `app/L0/_all/mod/_core/admin/AGENTS.md`
 - `admin/views/agent/` owns the admin-side agent surface; see `app/L0/_all/mod/_core/admin/views/agent/AGENTS.md`
 - `admin/views/files/` owns the firmware-backed file browser; see `app/L0/_all/mod/_core/admin/views/files/AGENTS.md`

@@ -17,11 +17,12 @@ This repository now uses a documentation hierarchy:
 Always update the relevant docs in the same session as the code change:
 
 - update the closest owning `AGENTS.md` for the files you changed
+- reflect stable architecture, workflow, and agent-facing behavior changes into the supplemental docs under `app/L0/_all/mod/_core/documentation/docs/`
 - update parent docs too when the higher-level contract, ownership boundary, architecture, or workflow changed
 - keep higher-level docs abstract where appropriate and push implementation detail down into local docs
 - keep lower-level docs concrete, explicit, and practical
 - remove stale or contradictory documentation immediately
-- do not create parallel architecture notes in `README.md`; durable agent guidance belongs in `AGENTS.md`
+- do not create parallel architecture notes in `README.md`; durable contracts belong in `AGENTS.md`, while broader agent-facing narrative docs belong in `app/L0/_all/mod/_core/documentation/docs/`
 
 Documentation depth model:
 
@@ -165,6 +166,7 @@ Child-doc obligations:
 - every parent doc must state what belongs in the parent versus the child docs
 - every parent doc must define the section pattern its child docs should follow
 - when a contract crosses parent and child scopes, update both docs in the same session
+- when a stable contract change affects the agent-facing documentation map, update the relevant docs under `app/L0/_all/mod/_core/documentation/docs/` and the documentation skill at `app/L0/_all/mod/_core/documentation/ext/skills/documentation/SKILL.md` in the same session
 
 ## Documentation Ownership
 
@@ -179,6 +181,7 @@ Core ownership:
 Local ownership:
 
 - module-local `AGENTS.md` files inside `app/` own the concrete contracts for major frontend modules and surfaces
+- `app/L0/_all/mod/_core/documentation/` owns the supplemental agent-facing documentation module, its fetch helper, and the browsable docs tree under `docs/`
 - subsystem-local `AGENTS.md` files inside `server/` own the concrete contracts for router, pages, APIs, customware, auth, file-watch, and Git infrastructure
 - `tests/AGENTS.md` owns repo-level test harness rules and child test-harness docs
 - see `/app/AGENTS.md` and `/server/AGENTS.md` for the current map of local docs
@@ -188,6 +191,7 @@ Documentation rules:
 - keep app-specific details in app docs, not in the root file
 - keep server-specific details in server docs, not in the root file
 - use local docs for implementation-specific module behavior instead of bloating the core docs
+- keep `AGENTS.md` files as the binding contract layer and keep the documentation module as the broader narrative and orientation layer; they must not drift
 - when a local doc later gains child docs, add a `Documentation Hierarchy` section there before the child docs multiply
 - when a code change adds a new stable seam, subsystem, ownership boundary, or workflow, document it where it belongs before finishing
 - when code reveals undocumented architecture, document it

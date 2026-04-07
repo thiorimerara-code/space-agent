@@ -499,6 +499,62 @@ function formatWidgetRecordForRead(widgetRecord) {
   ].join("\n");
 }
 
+function hasOwnWidgetPatchField(edit, key) {
+  return Object.prototype.hasOwnProperty.call(edit || {}, key);
+}
+
+function isWidgetPatchTextLike(value) {
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+}
+
+function readWidgetPatchContentField(edit = {}) {
+  if (hasOwnWidgetPatchField(edit, "content")) {
+    return {
+      key: "content",
+      value: edit.content
+    };
+  }
+
+  if (hasOwnWidgetPatchField(edit, "text")) {
+    return {
+      key: "text",
+      value: edit.text
+    };
+  }
+
+  if (hasOwnWidgetPatchField(edit, "replace")) {
+    return {
+      key: "replace",
+      value: edit.replace
+    };
+  }
+
+  if (hasOwnWidgetPatchField(edit, "value")) {
+    return {
+      key: "value",
+      value: edit.value
+    };
+  }
+
+  return null;
+}
+
+function normalizeWidgetPatchStringContent(contentField, { allowMissing = false, defaultValue = "" } = {}) {
+  if (!contentField) {
+    return allowMissing ? defaultValue : null;
+  }
+
+  if (contentField.value === undefined || contentField.value === null) {
+    return allowMissing ? defaultValue : "";
+  }
+
+  if (!isWidgetPatchTextLike(contentField.value)) {
+    throw new Error(`Widget patch \`${contentField.key}\` must be a string.`);
+  }
+
+  return String(contentField.value);
+}
+
 function normalizeWidgetPatchContentLines(content) {
   const normalizedContent = String(content ?? "").replace(/\r\n?/gu, "\n");
   const contentLines = normalizedContent.split("\n");
@@ -510,19 +566,95 @@ function normalizeWidgetPatchContentLines(content) {
   return contentLines;
 }
 
-function normalizeWidgetPatchEdit(edit, lineCount) {
+function findAllWidgetPatchOccurrences(sourceText, snippet) {
+  const indexes = [];
+  let searchIndex = 0;
+
+  while (searchIndex <= sourceText.length) {
+    const matchIndex = sourceText.indexOf(snippet, searchIndex);
+
+    if (matchIndex === -1) {
+      break;
+    }
+
+    indexes.push(matchIndex);
+    searchIndex = matchIndex + Math.max(1, snippet.length);
+  }
+
+  return indexes;
+}
+
+function normalizeWidgetTextPatchEdit(edit, sourceText) {
+  const rawFind = hasOwnWidgetPatchField(edit, "find")
+    ? edit.find
+    : hasOwnWidgetPatchField(edit, "search")
+      ? edit.search
+      : undefined;
+
+  if (typeof rawFind !== "string" || !rawFind) {
+    throw new Error("Exact widget snippet edits require a non-empty string `find` copied from the readable renderer.");
+  }
+
+  const matchIndexes = findAllWidgetPatchOccurrences(sourceText, rawFind);
+
+  if (!matchIndexes.length) {
+    throw new Error("Exact widget snippet edit `find` text was not found in the readable renderer.");
+  }
+
+  if (matchIndexes.length > 1) {
+    throw new Error("Exact widget snippet edit `find` text is ambiguous. Use a longer unique snippet or switch to line-based edits.");
+  }
+
+  return {
+    content: normalizeWidgetPatchStringContent(readWidgetPatchContentField(edit), {
+      allowMissing: true,
+      defaultValue: ""
+    }),
+    end: matchIndexes[0] + rawFind.length,
+    find: rawFind,
+    kind: "text",
+    mode: "text",
+    start: matchIndexes[0]
+  };
+}
+
+function normalizeWidgetPatchEdit(edit, lineCount, sourceText) {
   const normalizedEdit = edit && typeof edit === "object" ? edit : {};
-  const from = Number.parseInt(normalizedEdit.from, 10);
-  const hasTo = normalizedEdit.to !== undefined && normalizedEdit.to !== null && `${normalizedEdit.to}` !== "";
-  const to = hasTo ? Number.parseInt(normalizedEdit.to, 10) : null;
-  const hasContent = normalizedEdit.content !== undefined && normalizedEdit.content !== null;
+
+  if (hasOwnWidgetPatchField(normalizedEdit, "find") || hasOwnWidgetPatchField(normalizedEdit, "search")) {
+    return normalizeWidgetTextPatchEdit(normalizedEdit, sourceText);
+  }
+
+  const rawRange =
+    Array.isArray(normalizedEdit.range) && normalizedEdit.range.length >= 1 ? normalizedEdit.range : null;
+  const rawFrom = hasOwnWidgetPatchField(normalizedEdit, "from")
+    ? normalizedEdit.from
+    : hasOwnWidgetPatchField(normalizedEdit, "line")
+      ? normalizedEdit.line
+      : hasOwnWidgetPatchField(normalizedEdit, "startLine")
+        ? normalizedEdit.startLine
+        : rawRange?.[0];
+  const rawTo = hasOwnWidgetPatchField(normalizedEdit, "to")
+    ? normalizedEdit.to
+    : hasOwnWidgetPatchField(normalizedEdit, "endLine")
+      ? normalizedEdit.endLine
+      : rawRange?.length >= 2
+        ? rawRange[1]
+        : hasOwnWidgetPatchField(normalizedEdit, "line")
+          ? normalizedEdit.line
+          : null;
+  const from = Number.parseInt(rawFrom, 10);
+  const hasTo = rawTo !== undefined && rawTo !== null && `${rawTo}` !== "";
+  const to = hasTo ? Number.parseInt(rawTo, 10) : null;
+  const contentField = readWidgetPatchContentField(normalizedEdit);
+  const hasContent = Boolean(contentField);
 
   if (!Number.isInteger(from) || from < 0) {
     throw new Error("Widget patch edits require an integer zero-based renderer `from` line number of 0 or greater.");
   }
 
   if (!hasTo && !hasContent) {
-    throw new Error("Insert edits must include `content`.");
+    throw new Error("Insert edits must include replacement text in `content`.");
   }
 
   if (!hasTo) {
@@ -533,9 +665,10 @@ function normalizeWidgetPatchEdit(edit, lineCount) {
     }
 
     return {
-      contentLines: normalizeWidgetPatchContentLines(normalizedEdit.content),
+      contentLines: normalizeWidgetPatchContentLines(normalizeWidgetPatchStringContent(contentField)),
       from,
       kind: "insert",
+      mode: "line",
       to: null
     };
   }
@@ -551,14 +684,15 @@ function normalizeWidgetPatchEdit(edit, lineCount) {
   }
 
   return {
-    contentLines: hasContent ? normalizeWidgetPatchContentLines(normalizedEdit.content) : [],
+    contentLines: hasContent ? normalizeWidgetPatchContentLines(normalizeWidgetPatchStringContent(contentField)) : [],
     from,
     kind: "replace",
+    mode: "line",
     to
   };
 }
 
-function validateWidgetPatchEdits(edits = [], lineCount = 0) {
+function validateLineWidgetPatchEdits(edits = [], lineCount = 0) {
   const spans = edits
     .map((edit) =>
       edit.kind === "insert"
@@ -592,15 +726,70 @@ function validateWidgetPatchEdits(edits = [], lineCount = 0) {
   }
 }
 
+function validateTextWidgetPatchEdits(edits = [], sourceText = "") {
+  const spans = edits
+    .map((edit) => ({
+      end: edit.end,
+      label: `find "${normalizeInlineText(edit.find, "").slice(0, 60)}"`,
+      start: edit.start
+    }))
+    .sort((left, right) => left.start - right.start || left.end - right.end);
+
+  for (let index = 1; index < spans.length; index += 1) {
+    if (spans[index].start < spans[index - 1].end) {
+      throw new Error(`Widget patch edits must not overlap. Conflicting edits: ${spans[index - 1].label} and ${spans[index].label}.`);
+    }
+  }
+
+  if (sourceText.length > 0) {
+    const rewritesWholeRenderer = edits.some((edit) => edit.start === 0 && edit.end === sourceText.length);
+
+    if (rewritesWholeRenderer) {
+      throw new Error("patchWidget(...) is for partial renderer edits only; use renderWidget(...) for a full renderer rewrite.");
+    }
+  }
+}
+
+function validateWidgetPatchEdits(edits = [], lineCount = 0, sourceText = "") {
+  const patchModes = uniqueList(edits.map((edit) => edit.mode).filter(Boolean));
+
+  if (patchModes.length > 1) {
+    throw new Error("Widget patch edits must use either zero-based line ranges or exact `find` snippets in one call, not both.");
+  }
+
+  if (patchModes[0] === "text") {
+    validateTextWidgetPatchEdits(edits, sourceText);
+    return;
+  }
+
+  validateLineWidgetPatchEdits(edits, lineCount);
+}
+
 function applyWidgetPatchEdits(widgetRecord, edits = []) {
   const sourceLines = getWidgetRendererReadLines(widgetRecord);
-  const normalizedEdits = (Array.isArray(edits) ? edits : []).map((edit) => normalizeWidgetPatchEdit(edit, sourceLines.length));
+  const sourceText = sourceLines.join("\n");
+  const normalizedEdits = (Array.isArray(edits) ? edits : []).map((edit) =>
+    normalizeWidgetPatchEdit(edit, sourceLines.length, sourceText)
+  );
 
   if (!normalizedEdits.length) {
     return normalizeWidgetRecord(widgetRecord, widgetRecord).rendererSource;
   }
 
-  validateWidgetPatchEdits(normalizedEdits, sourceLines.length);
+  validateWidgetPatchEdits(normalizedEdits, sourceLines.length, sourceText);
+
+  if (normalizedEdits[0]?.mode === "text") {
+    let nextText = sourceText;
+
+    [...normalizedEdits]
+      .sort((left, right) => right.start - left.start)
+      .forEach((edit) => {
+        nextText = `${nextText.slice(0, edit.start)}${edit.content}${nextText.slice(edit.end)}`;
+      });
+
+    return normalizeRendererSource(nextText);
+  }
+
   const nextLines = [...sourceLines];
   // Apply from bottom to top so every `from`/`to` range stays anchored to the
   // last numbered widget readback, even when the same patch inserts or deletes lines.

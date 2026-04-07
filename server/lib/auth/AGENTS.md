@@ -77,4 +77,5 @@ Rules:
 - do not hand-roll `password.json` contents outside backend helpers; use `password_generate`, `user_manage.js`, or auth-service helpers so the backend seal key is applied correctly
 - treat the current local file-backed auth model as a constrained infrastructure contract, not as a place to casually grow unrelated policy
 - if user storage, session semantics, or login flow change, also update `app/L0/_all/mod/_core/onscreen_agent/ext/skills/development/` because its development skills mirror this contract
+- if user storage, session semantics, or login flow change, also update the matching docs under `app/L0/_all/mod/_core/documentation/docs/server/`
 - if user storage, session semantics, or login flow change, update this file and the relevant router or API docs in the same session

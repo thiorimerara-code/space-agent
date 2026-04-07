@@ -75,4 +75,5 @@ Current shell layout note:
 - route-load failures should log to the browser console before the router renders its inline error card
 - routed feature modules should ship their own `view.html` and let the router mount them
 - if route resolution or stable router seams change, also update `app/L0/_all/mod/_core/onscreen_agent/ext/skills/development/` because the onscreen development skill mirrors this contract
+- if route resolution or stable router seams change, also update the matching docs under `app/L0/_all/mod/_core/documentation/docs/app/`
 - if you add or rename a stable router seam, update this file and `/app/AGENTS.md`

@@ -10,8 +10,9 @@ Use this skill first for any development task. This is a routing skill: it tells
 - This skill set only authorizes development in `app/`.
 - Do not edit `server/`, `commands/`, or `packaging/` from this skill set.
 - Load `development/backend-reference` only to understand backend contracts that the frontend calls into.
+- For broad architecture orientation, load the top-level `documentation` skill and use its built-in docs map before diving into narrower docs.
 - Before writing files, call `await space.api.userSelfInfo()` and derive writable roots from `username`, `managedGroups`, and `_admin` membership in `groups`.
-- Always update the relevant `AGENTS.md` files in the same session as your code changes.
+- Always update the relevant `AGENTS.md` files and the matching docs under `/mod/_core/documentation/docs/` in the same session as your code changes.
 
 ## Load These Skills Next
 
@@ -53,4 +54,4 @@ Use this skill first for any development task. This is a routing skill: it tells
 
 ## Final Rule
 
-Before changing a concrete module, also read the closest owning `AGENTS.md` in that module's subtree. The development skills are the cross-cutting map; the local `AGENTS.md` file is the final implementation contract.
+Before changing a concrete module, also read the closest owning `AGENTS.md` in that module's subtree and the relevant documentation page when one exists. The development skills are the cross-cutting map, the `documentation` skill plus helper are the narrative map, and the local `AGENTS.md` file is the final implementation contract.

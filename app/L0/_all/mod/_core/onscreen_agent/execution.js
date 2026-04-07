@@ -165,36 +165,76 @@ function hasInlineExecutionSeparator(content) {
   return false;
 }
 
-function createExecutionPlanError(message) {
+export function createExecutionPlanError(message) {
   const error = new Error(message);
   error.name = "ExecutionPlanError";
   return error;
 }
 
-function hasWidgetDiscoveryHelper(code = "") {
-  return /\bspace\.(?:current|spaces)\.(?:listWidgets|readWidget)\s*\(/u.test(code);
-}
+export const validateOnscreenAgentExecutionBlockPlan = globalThis.space.extend(
+  import.meta,
+  async function validateOnscreenAgentExecutionBlockPlan(context = {}) {
+    return {
+      ...context,
+      code: normalizeExecutionSource(context?.code ?? context?.block?.code),
+      errors: Array.isArray(context?.errors) ? [...context.errors] : []
+    };
+  }
+);
 
-function hasWidgetMutationHelper(code = "") {
-  return /\bspace\.(?:current|spaces)\.(?:patchWidget|renderWidget|upsertWidget)\s*\(/u.test(code);
-}
-
-function validateExecutionBlockPlan(block) {
-  const code = normalizeExecutionSource(block?.code);
-
-  if (hasWidgetDiscoveryHelper(code) && hasWidgetMutationHelper(code)) {
-    return createExecutionPlanError(
-      "Widget discovery and dependent widget mutation must be separate turns. End after listWidgets(...) or readWidget(...), wait for the next turn, then patch or render."
-    );
+function coerceExecutionPlanError(value) {
+  if (!value) {
+    return null;
   }
 
-  if (/\bspace\.current\.readWidget\s*\(/u.test(code) && /\bspace\.chat\.transient\b/u.test(code)) {
-    return createExecutionPlanError(
-      "Do not read freshly refreshed TRANSIENT in the same execution block as readWidget(...). End after readWidget(...), then use TRANSIENT on the next turn."
-    );
+  if (value instanceof Error) {
+    if (!value.name) {
+      value.name = "ExecutionPlanError";
+    }
+
+    return value;
   }
 
-  return null;
+  if (typeof value === "string") {
+    return createExecutionPlanError(value);
+  }
+
+  const message = typeof value?.message === "string" ? value.message.trim() : "";
+
+  if (!message) {
+    return null;
+  }
+
+  const error = new Error(message);
+  error.name = typeof value?.name === "string" && value.name ? value.name : "ExecutionPlanError";
+  return error;
+}
+
+function collectExecutionPlanErrors(validationResult) {
+  const collected = [];
+
+  if (Array.isArray(validationResult?.errors)) {
+    collected.push(...validationResult.errors);
+  }
+
+  if (validationResult?.error != null) {
+    collected.push(validationResult.error);
+  }
+
+  if (!collected.length && (validationResult instanceof Error || typeof validationResult === "string")) {
+    collected.push(validationResult);
+  }
+
+  return collected.map((value) => coerceExecutionPlanError(value)).filter(Boolean);
+}
+
+async function resolveExecutionBlockPlanError(block) {
+  const validationResult = await validateOnscreenAgentExecutionBlockPlan({
+    block,
+    code: normalizeExecutionSource(block?.code),
+    errors: []
+  });
+  return collectExecutionPlanErrors(validationResult)[0] || null;
 }
 
 function createAsyncRunner(code) {
@@ -937,7 +977,7 @@ function formatExecutionResultLines(result) {
   }
 
   if (!result?.error?.text && result?.result === undefined && !prints.length && !loadedSkills.length) {
-    lines.push("no result returned, no console logs");
+    lines.push("execution returned no result and no console logs were printed");
   }
 
   if (result?.error?.text) {
@@ -1107,7 +1147,7 @@ export function createExecutionContext(options = {}) {
 
       for (let index = 0; index < blocks.length; index += 1) {
         const block = blocks[index];
-        const planError = validateExecutionBlockPlan(block);
+        const planError = await resolveExecutionBlockPlanError(block);
 
         if (typeof options.onBeforeBlock === "function") {
           await options.onBeforeBlock({

@@ -2,6 +2,7 @@ import * as config from "/mod/_core/onscreen_agent/config.js";
 import { buildMessageContentForApi } from "/mod/_core/onscreen_agent/attachments.js";
 import * as llmParams from "/mod/_core/onscreen_agent/llm-params.js";
 import * as skills from "/mod/_core/onscreen_agent/skills.js";
+import { mergeConsecutiveChatMessages } from "/mod/_core/framework/js/chat-messages.js";
 import * as proxyUrl from "/mod/_core/framework/js/proxy-url.js";
 
 export const DEFAULT_ONSCREEN_AGENT_SYSTEM_PROMPT_PATH = "/mod/_core/onscreen_agent/prompts/system-prompt.md";
@@ -724,7 +725,9 @@ export function createOnscreenAgentPromptInstance(options = {}) {
 }
 
 function createRequestBody(settings, promptInput) {
-  const requestMessages = Array.isArray(promptInput?.requestMessages) ? promptInput.requestMessages : [];
+  const requestMessages = mergeConsecutiveChatMessages(
+    Array.isArray(promptInput?.requestMessages) ? promptInput.requestMessages : []
+  );
 
   return {
     ...llmParams.parseOnscreenAgentParamsText(settings.paramsText || ""),
