@@ -95,6 +95,8 @@ These rules apply across the codebase:
 - backend ownership is reserved for security-sensitive enforcement, integrity boundaries, cross-user effects, or runtime-stability concerns that a malicious or buggy frontend could bypass
 - prefer explicit, small contracts between browser and server
 - prefer maintainable filesystem structure over clever routing shortcuts
+- do not create new scratch, temporary, or throwaway directories under the repo as tracked content, especially hidden paths such as `.tmp/`; local verification artifacts must stay outside the published repo or in ignored local paths unless the user explicitly asks for a checked-in fixture
+- do not check generated binaries, staged release outputs, or other ephemeral build artifacts into ad hoc repo locations; if a durable fixture is truly required, keep it small, intentional, and in an owned non-hidden test or documentation path
 
 ## Top-Level Structure
 
@@ -159,7 +161,7 @@ Project concepts:
 - `node space supervise CUSTOMWARE_PATH=<path>` to run the production-ready zero-downtime auto-update supervisor for source checkouts
 - `npm run install:packaging` to install packaging-only dependencies
 - `npm run desktop:dev`, `npm run desktop:pack`, and `npm run desktop:dist` for the Electron host and packaging flow
-- `.github/workflows/release-desktop.yml` builds tagged desktop releases for Windows, macOS, and Linux on both x64 and arm64; automatic runs start only from pushed `v*` tags whose tag commit points at `main` HEAD, manual `workflow_dispatch` reruns accept an existing Git tag on `main` history, and every publish updates the GitHub Release for that tag before uploading clobbered artifacts selected by `packaging/release-asset-filters.yaml` with uniform `Space-Agent-<release version>-<platform>-<arch>.<extension>` asset names that collapse a redundant trailing `.0` patch to the project's normal two-segment release version
+- `.github/workflows/release-desktop.yml` builds tagged desktop releases for Windows, macOS, and Linux on both x64 and arm64; automatic tag runs and manual `workflow_dispatch` reruns both require the selected `v*` tag to be on `main` history, and both skip only when a newer `v*` tag is already on `main` after it; every publish updates the GitHub Release for that tag before uploading clobbered artifacts selected by `packaging/release-asset-filters.yaml` with uniform `Space-Agent-<release version>-<platform>-<arch>.<extension>` asset names that collapse a redundant trailing `.0` patch to the project's normal two-segment release version
 
 ## Documentation System
 

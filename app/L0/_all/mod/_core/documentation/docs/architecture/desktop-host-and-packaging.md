@@ -82,8 +82,8 @@ Current release contract:
 
 - the workflow runs automatically on pushed `v*` tags
 - normal `main` branch pushes do not publish desktop releases unless the `v*` tag ref is pushed too
-- automatic tag-push runs publish desktop artifacts only when the tag commit points at `origin/main` HEAD
-- manual `workflow_dispatch` runs require an existing Git tag input and publish only when that tag is already on `origin/main` history, so failed or partial releases can be rebuilt after `main` has advanced
+- automatic tag-push runs publish desktop artifacts when the selected tag is already on `origin/main` history and no newer `v*` tag is already on `origin/main` after it
+- manual `workflow_dispatch` runs require an existing Git tag input and use that same gate, so failed or partial releases can be rebuilt after `main` has advanced as long as no newer release tag has already landed on `main` after the requested one
 - fresh builds cover Windows, macOS, and Linux on both x64 and arm64 runners
 - local and CI builds share the same packaging scripts, with CI passing the tag-derived semver build version through `SPACE_APP_VERSION`
 - release notes are generated automatically from the commit range between the previous published release and the current tag, with an empty previous tag allowed when no prior published release is available, and CI requires the OpenRouter prompt helper under `packaging/resources/release-notes/` to return a non-empty AI-written body
