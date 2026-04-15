@@ -15,6 +15,7 @@ This repo has three documentation surfaces on purpose.
 - are the binding contract layer
 - define ownership, stable seams, update obligations, and implementation boundaries
 - are hierarchical, with deeper `AGENTS.md` files overriding broader ones inside their subtree
+- the root `/AGENTS.md` also keeps an exhaustive index of every other repo `AGENTS.md` path so the current documentation map is visible without filesystem discovery
 
 The documentation module at `app/L0/_all/mod/_core/documentation/`:
 
@@ -71,6 +72,7 @@ What does not belong here:
 ## Practical Reading Pattern
 
 - start with the `documentation` skill's built-in index
+- use the root `/AGENTS.md` index when you need to locate the owning contract quickly
 - read one focused doc
 - jump to the owning `AGENTS.md`
 - then inspect code

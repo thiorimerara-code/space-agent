@@ -58,11 +58,11 @@ When a real user turn includes attachments, the `_____user` block contains the l
 Prompt construction includes two skill-related sections:
 
 - the top-level skill catalog built from readable `mod/*/*/ext/skills/*/SKILL.md` files
-- the auto-loaded skill context for readable skills anywhere under `ext/skills/**/SKILL.md` whose `metadata.loaded` condition currently passes
+- the auto-loaded skill context for readable top-level `ext/skills/*/SKILL.md` files whose `metadata.loaded` condition currently passes
 
 Both sections are filtered by the current document's live `<x-skill-context>` tags before prompt assembly.
 
-Both `metadata.when` and `metadata.loaded` accept either `true` or a `{ tags: [...] }` condition. The shared helper reads those live tags every time it builds the catalog, resolves an explicit skill load, or assembles auto-loaded prompt context. Auto-loaded skills may not resolve to `history`, so their missing or invalid placement and explicit `history` all fall back to `system` unless they explicitly set `transient`.
+Both `metadata.when` and `metadata.loaded` accept either `true` or a `{ tags: [...] }` condition. The shared helper reads those live tags every time it builds the catalog, resolves an explicit skill load, or assembles auto-loaded prompt context. Auto-loaded prompt discovery is top-level only, and auto-loaded skills may land only in `system` or `transient`, so their missing or invalid placement and explicit `history` all fall back to `system` unless they explicitly set `transient`.
 
 Top-level skill catalog rows use the compact shape:
 
@@ -117,4 +117,4 @@ Important extension families:
 - final prompt-input assembly
 - execution-plan validation hooks
 
-Current first-party examples include `_core/spaces` for current-space instructions, `_core/promptinclude` for persistent split system/transient include discovery, and the `_core/onscreen_agent` display-mode transient hook for compact-mode reply guidance. Module-specific workflow policy still belongs in owner-module skills or owner-module `_core/onscreen_agent/...` JS hooks.
+Current first-party examples include `_core/spaces` for current-space instructions, `_core/promptinclude` for persistent split system/transient include discovery, `_core/memory` for prompt-include-backed `~/memory/` behavior and rolling notes through an auto-loaded system skill, and the `_core/onscreen_agent` display-mode transient hook for compact-mode reply guidance. Module-specific workflow policy still belongs in owner-module skills or owner-module `_core/onscreen_agent/...` JS hooks.

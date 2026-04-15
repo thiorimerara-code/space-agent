@@ -55,6 +55,7 @@ Current contract:
 - `0` disables quota checks
 - positive values cap each resolved `L2/<user>/` folder in bytes
 - app-file writes, copies, moves, and deletes are checked before mutation
+- app-file writes still default to replacement, but `file_write` also supports append, prepend, and text insert anchors; insert uses a 1-based line insertion point or the first literal `before` or `after` match and requires `utf8`
 - projected growth over the cap is rejected
 - when a user folder is already over cap, only mutations that reduce that folder's net byte size are allowed
 - quota accounting is cached per resolved L2 owner root and updated by mutation deltas instead of rescanning on every write

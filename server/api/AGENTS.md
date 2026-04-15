@@ -66,6 +66,7 @@ Current rules:
 - `file_list` and `file_paths` accept `gitRepositories: true`; with patterns such as `**/.git/`, `file_paths` returns matching local-history owner roots like `L1/<group>/` or `L2/<user>/` while keeping `.git` metadata reserved and hidden
 - `file_paths` also accepts an optional explicit `maxLayer` body or query value when module-oriented discovery should ignore higher writable layers; this is used by the admin agent skill catalog so firmware-backed `ext/skills/` files are not shadowed by L1 or L2 customware
 - batch operations validate all targets before any mutation begins
+- `file_write` still defaults to full-file replacement, but object-form writes also support `operation: "append"`, `"prepend"`, or `"insert"`; insert writes accept exactly one of `line`, `before`, or `after`, use the first literal `before` or `after` match, and require `utf8` encoding
 - when `USER_FOLDER_SIZE_LIMIT_BYTES` is positive, `file_write`, `file_copy`, `file_move`, `file_delete`, and module removal through `file_access.js` enforce the per-`L2/<user>/` folder quota before mutation; quota errors return `413`
 - single-file or single-folder copy and move requests must keep working when request plumbing omits `entries`; only real batch calls should forward an `entries` array to the shared helper
 - endpoint-specific validation should stay thin and reuse the shared helper contract

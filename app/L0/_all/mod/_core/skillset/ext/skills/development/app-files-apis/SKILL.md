@@ -29,6 +29,8 @@ Current wrapped helpers include:
 
 `fileRead(...)` accepts one logical path, one `{ path, encoding? }` entry, or a `files` batch. The frontend wrapper now coalesces same-tick reads into one `/api/file_read` request and re-slices the returned files back to each caller, retrying individually when a combined batch fails so shorthand paths and optional missing-file reads still behave like standalone calls. Explicit batching is still best when you already have the file list, but small independent reads no longer fan out 1:1 by default.
 
+`fileWrite(...)` still supports the simple replacement form `fileWrite(path, content, encoding?)`, but object-form writes also support incremental updates: `{ path, content, operation: "append" }`, `{ path, content, operation: "prepend" }`, or `{ path, content, operation: "insert", line | before | after }`. Insert writes accept exactly one anchor, use the first literal `before` or `after` match, treat `line` as a 1-based insertion point, and require `utf8`. Batch writes may set those fields per entry or once at the top level as defaults. Prefer these incremental write modes when you only need to add or place text instead of rereading and rewriting the whole file.
+
 Use `space.api.folderDownloadUrl(...)` when the browser should trigger a regular authenticated folder download without buffering the ZIP file into frontend memory first.
 
 When a UI needs user-visible download failure feedback without fetching the archive blob into memory, preflight the request with `space.api.fileInfo(...)` for files or `space.api.call("folder_download", { method: "HEAD", query: { path } })` for folders before starting the browser download.

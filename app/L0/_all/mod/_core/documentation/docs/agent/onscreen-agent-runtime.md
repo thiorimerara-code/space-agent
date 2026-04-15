@@ -133,6 +133,6 @@ Prompt file ownership is split:
 
 The current live firmware prompt was promoted from `tests/agent_llm_performance/prompts/069A_handoff_no_copy.md` on `2026-04-07` after the `070` through `075` sweep confirmed it was still the best overall prompt on the 57-case suite.
 
-The base prompt file is not the only model-facing prompt source. `_core/promptinclude` adds the stable prompt-include instruction section through the prompt-section seam, appends readable `*.system.include.md` files there as additional system-prompt sections, and injects readable `*.transient.include.md` file bodies later through transient context.
+The base prompt file is not the only model-facing prompt source. `_core/promptinclude` adds the stable prompt-include instruction section through the prompt-section seam, appends readable `*.system.include.md` files there as additional system-prompt sections, and injects readable `*.transient.include.md` file bodies later through transient context. `_core/memory` adds an always-on `memory` skill through the existing auto-loaded system-skill channel and uses those prompt-include files as its persistence layer.
 
 Read `agent/prompt-and-execution.md` next for the actual prompt assembly and execution protocol.

@@ -39,6 +39,7 @@ The admin agent now uses the same shared browser-side skill helper as the onscre
 - the admin shell exports `admin`, so admin-owned skills may require `metadata.when.tags: [admin]`
 - `metadata.when` and `metadata.loaded` both accept either `true` or a `{ tags: [...] }` condition, so admin skills use the same live page-tag matcher for catalog visibility and automatic prompt inclusion
 - `metadata.loaded` works here too, so the admin prompt can append the matching auto-loaded skill context without hardcoding specific skill ids; those auto-loaded skills may resolve only to `system` or `transient`, with `system` as the fallback
+- the first-party `memory` skill is one of those auto-loaded system skills and teaches prompt-include-backed user memory under `~/memory/`
 - `space.admin.loadSkill("path")` loads a matching `ext/skills/.../SKILL.md` file on demand
 - admin skill discovery is still firmware-clamped because `views/agent/skills.js` resolves those skill paths with explicit `maxLayer=0`
 

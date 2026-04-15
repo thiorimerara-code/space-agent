@@ -1,5 +1,4 @@
 export const TOP_LEVEL_SKILL_FILE_PATTERN = "mod/*/*/ext/skills/*/SKILL.md";
-export const ALL_SKILL_FILE_PATTERN = "mod/*/*/ext/skills/**/SKILL.md";
 export const SKILL_FILE_NAME = "SKILL.md";
 export const SKILLS_ROOT_SEGMENT = "/ext/skills/";
 export const SKILL_CONTEXT_SELECTOR = "x-skill-context";
@@ -13,7 +12,6 @@ const BOOLEAN_FALSE_VALUES = new Set(["", "0", "false", "no", "off"]);
 const BOOLEAN_TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
 const SKILL_TAG_PATTERN = /^[A-Za-z0-9._:/-]+$/u;
 const VALID_SKILL_PLACEMENTS = new Set(Object.values(SKILL_PLACEMENT));
-const DEFAULT_SKILL_HISTORY_KIND = "skill";
 
 function readMetadataBooleanValue(value) {
   if (value === true || value === 1) {
@@ -207,6 +205,10 @@ function isSkillAutoLoadedForContext(skill, contextTagSet) {
 
   if (skill.loaded === true) {
     return true;
+  }
+
+  if (!skill.loaded) {
+    return false;
   }
 
   return matchesSkillCondition(skill.loaded, contextTagSet);
@@ -443,20 +445,6 @@ export function getSkillLoadResponseText(skill) {
 function formatSkillPromptBlock(skill) {
   const normalizedSkill = normalizePromptSkill(skill);
   return normalizedSkill ? `id: ${normalizedSkill.path}\n${normalizedSkill.body}` : "";
-}
-
-function createSkillHistoryMessage(skill, kind = DEFAULT_SKILL_HISTORY_KIND) {
-  const content = formatSkillPromptBlock(skill);
-
-  if (!content) {
-    return null;
-  }
-
-  return {
-    content,
-    kind,
-    role: "user"
-  };
 }
 
 function createSkillTransientSection(skill, options = {}) {
@@ -717,12 +705,6 @@ export function buildAutoLoadedSkillsPromptSection(index) {
   ]
     .filter(Boolean)
     .join("\n\n");
-}
-
-export function buildAutoLoadedSkillsHistoryMessages(index, options = {}) {
-  return filterPromptSkillsByPlacement(index?.autoLoadedSkills, SKILL_PLACEMENT.HISTORY)
-    .map((skill) => createSkillHistoryMessage(skill, options.kind))
-    .filter(Boolean);
 }
 
 export function buildAutoLoadedSkillsTransientSections(index, options = {}) {

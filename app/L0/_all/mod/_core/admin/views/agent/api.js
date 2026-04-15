@@ -178,9 +178,6 @@ function normalizeAdminPromptContext(promptContext, fallbackSystemPrompt = "") {
       : {};
 
   return {
-    historySkillMessages: Array.isArray(normalizedContext.historySkillMessages)
-      ? normalizedContext.historySkillMessages.map((message) => normalizeConversationMessage(message)).filter(Boolean)
-      : [],
     systemPrompt:
       typeof normalizedContext.systemPrompt === "string"
         ? normalizedContext.systemPrompt.trim()
@@ -218,13 +215,6 @@ export function buildAdminAgentPromptMessages(systemPromptOrContext, messages, o
       content: effectiveSystemPrompt
     });
   }
-
-  promptContext.historySkillMessages.forEach((message) => {
-    requestMessages.push({
-      role: message.role,
-      content: buildMessageContentForApi(message)
-    });
-  });
 
   messages.forEach((message) => {
     const normalizedMessage = normalizeConversationMessage(message);

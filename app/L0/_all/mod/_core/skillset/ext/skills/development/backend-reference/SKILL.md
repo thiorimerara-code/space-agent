@@ -36,6 +36,8 @@ Important frontend-facing endpoint families are:
 
 These endpoints are thin wrappers over shared helpers in `server/lib/customware/` and `server/lib/auth/`.
 
+`file_write` still defaults to whole-file replacement, but it also supports `operation: "append"`, `"prepend"`, and `"insert"`. Insert writes accept exactly one anchor through `line`, `before`, or `after`, use the first literal `before` or `after` match, treat `line` as a 1-based insertion point, and require `utf8`.
+
 `file_list` and `file_paths` support `access: "write"` or `writableOnly: true` for writable-only discovery. They also support `gitRepositories: true`; with a pattern such as `**/.git/`, `file_paths` returns local-history owner roots like `L1/team/` and `L2/alice/` without exposing reserved `.git` metadata paths.
 
 `folder_download` supports `HEAD` for permission-only validation and `GET` or `POST` for the streamed ZIP attachment. It creates the archive in `server/tmp/` only for the actual download response, after the shared file-access layer approves the requested folder path.

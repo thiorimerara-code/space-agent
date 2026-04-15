@@ -22,6 +22,7 @@ There is no separate user registry file. The watched user index is derived from 
 ## File API Rules
 
 - Create directories by writing a path that ends with `/`, for example `await space.api.fileWrite("L2/alice/")` or `await space.api.fileWrite("L2/alice/mod/")`.
+- `fileWrite(...)` also supports incremental object-form writes such as `operation: "append"`, `"prepend"`, or `"insert"` when you only need to place text without rewriting the whole file.
 - Delete files or directories with `await space.api.fileDelete(path)`. Directory deletes are recursive.
 - Use `await space.api.call("password_generate", { method: "POST", body: { password } })` to create a fresh sealed password record before writing `meta/password.json`.
 - Do not hand-roll `meta/password.json` or individual session entries. The backend secret must sign or seal them.

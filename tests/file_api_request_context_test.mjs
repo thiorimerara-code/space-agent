@@ -62,11 +62,30 @@ test("file APIs use router-supplied request context fields", async (testContext)
     path: "L2/user/hello.txt"
   });
 
+  const insertResult = await postJson("/api/file_write", {
+    after: "hello",
+    content: " there",
+    operation: "insert",
+    path: "~/hello.txt"
+  });
+  assert.equal(insertResult.response.status, 200);
+  assert.equal(insertResult.body.path, "L2/user/hello.txt");
+
+  const insertedReadResult = await postJson("/api/file_read", {
+    path: "~/hello.txt"
+  });
+  assert.equal(insertedReadResult.response.status, 200);
+  assert.deepEqual(insertedReadResult.body, {
+    content: "hello there",
+    encoding: "utf8",
+    path: "L2/user/hello.txt"
+  });
+
   const infoResult = await postJson("/api/file_info", {
     path: "~/hello.txt"
   });
   assert.equal(infoResult.response.status, 200);
   assert.equal(infoResult.body.path, "L2/user/hello.txt");
   assert.equal(infoResult.body.isDirectory, false);
-  assert.equal(infoResult.body.size, Buffer.byteLength("hello"));
+  assert.equal(infoResult.body.size, Buffer.byteLength("hello there"));
 });

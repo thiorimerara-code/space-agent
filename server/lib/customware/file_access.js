@@ -668,6 +668,175 @@ function getAppFolderDownloadInfo(options = {}) {
   };
 }
 
+function getExplicitWriteField(request, options, key) {
+  if (isPlainObject(request) && Object.prototype.hasOwnProperty.call(request, key)) {
+    return request[key];
+  }
+
+  if (Object.prototype.hasOwnProperty.call(options, key)) {
+    return options[key];
+  }
+
+  return undefined;
+}
+
+function ensureValidWriteOperation(operation) {
+  const normalizedOperation = String(operation || "replace").trim().toLowerCase();
+
+  if (!normalizedOperation || normalizedOperation === "replace") {
+    return "replace";
+  }
+
+  if (normalizedOperation === "append" || normalizedOperation === "prepend" || normalizedOperation === "insert") {
+    return normalizedOperation;
+  }
+
+  throw createHttpError("Unsupported write operation: " + String(operation || ""), 400);
+}
+
+function normalizeWriteInsertTarget(request, options, operation, requestedPath) {
+  const rawLine = getExplicitWriteField(request, options, "line");
+  const rawBefore = getExplicitWriteField(request, options, "before");
+  const rawAfter = getExplicitWriteField(request, options, "after");
+  const targetCount = Number(rawLine !== undefined) + Number(rawBefore !== undefined) + Number(rawAfter !== undefined);
+
+  if (operation !== "insert") {
+    if (targetCount > 0) {
+      throw createHttpError(
+        "Write operation " + operation + " does not accept line, before, or after: " + requestedPath,
+        400
+      );
+    }
+
+    return null;
+  }
+
+  if (targetCount !== 1) {
+    throw createHttpError(
+      "Insert writes require exactly one of line, before, or after: " + requestedPath,
+      400
+    );
+  }
+
+  if (rawLine !== undefined) {
+    const line = Number(rawLine);
+    if (!Number.isInteger(line) || line < 1) {
+      throw createHttpError("Insert line must be a positive integer: " + requestedPath, 400);
+    }
+
+    return {
+      type: "line",
+      line
+    };
+  }
+
+  if (rawBefore !== undefined) {
+    const pattern = String(rawBefore ?? "");
+    if (!pattern) {
+      throw createHttpError("Insert before pattern must not be empty: " + requestedPath, 400);
+    }
+
+    return {
+      type: "before",
+      pattern
+    };
+  }
+
+  const pattern = String(rawAfter ?? "");
+  if (!pattern) {
+    throw createHttpError("Insert after pattern must not be empty: " + requestedPath, 400);
+  }
+
+  return {
+    type: "after",
+    pattern
+  };
+}
+
+function createLineInsertOffsets(content) {
+  const offsets = [0];
+
+  for (let index = 0; index < content.length; index += 1) {
+    if (content[index] === "\n") {
+      offsets.push(index + 1);
+    }
+  }
+
+  if (offsets[offsets.length - 1] !== content.length) {
+    offsets.push(content.length);
+  }
+
+  return offsets;
+}
+
+function resolveTextInsertOffset(existingText, insertTarget, requestedPath) {
+  if (insertTarget?.type === "line") {
+    const offsets = createLineInsertOffsets(existingText);
+
+    if (insertTarget.line > offsets.length) {
+      throw createHttpError("Insert line " + insertTarget.line + " is out of range: " + requestedPath, 400);
+    }
+
+    return offsets[insertTarget.line - 1];
+  }
+
+  const pattern = String(insertTarget?.pattern || "");
+  const matchIndex = existingText.indexOf(pattern);
+
+  if (matchIndex === -1) {
+    throw createHttpError("Insert pattern not found: " + requestedPath, 404);
+  }
+
+  return insertTarget.type === "after" ? matchIndex + pattern.length : matchIndex;
+}
+
+function readExistingWriteBuffer(absolutePath, requestedPath) {
+  if (!fs.existsSync(absolutePath)) {
+    return Buffer.alloc(0);
+  }
+
+  const stats = fs.statSync(absolutePath);
+
+  if (stats.isDirectory()) {
+    throw createHttpError("Expected a file path: " + requestedPath, 400);
+  }
+
+  return fs.readFileSync(absolutePath);
+}
+
+function buildWriteBuffer(options = {}) {
+  const encoding = options.encoding || "utf8";
+  const operation = options.operation || "replace";
+  const nextContent = String(options.content ?? "");
+  const contentBuffer = encoding === "base64" ? Buffer.from(nextContent, "base64") : Buffer.from(nextContent, "utf8");
+
+  if (operation === "replace") {
+    return contentBuffer;
+  }
+
+  const existingBuffer = readExistingWriteBuffer(options.absolutePath, options.requestedPath);
+
+  if (operation === "append") {
+    return Buffer.concat([existingBuffer, contentBuffer]);
+  }
+
+  if (operation === "prepend") {
+    return Buffer.concat([contentBuffer, existingBuffer]);
+  }
+
+  if (encoding !== "utf8") {
+    throw createHttpError("Insert writes require utf8 encoding: " + options.requestedPath, 400);
+  }
+
+  const existingText = existingBuffer.toString("utf8");
+  const insertOffset = resolveTextInsertOffset(existingText, options.insertTarget, options.requestedPath);
+
+  return Buffer.from(
+    existingText.slice(0, insertOffset) + nextContent + existingText.slice(insertOffset),
+    "utf8"
+  );
+}
+
 function normalizeWriteEntries(options = {}) {
   if (Array.isArray(options.files)) {
     if (options.files.length === 0) {
@@ -683,8 +852,12 @@ function normalizeWriteEntries(options = {}) {
 
   return [
     {
+      after: options.after,
+      before: options.before,
       content: options.content,
       encoding: options.encoding,
+      line: options.line,
+      operation: options.operation,
       path: options.path
     }
   ];
@@ -714,22 +887,29 @@ function normalizeWriteRequests(options = {}) {
     );
 
     if (!normalizedProjectPath) {
-      throw createHttpError(`Expected a writable path: ${requestedPath || "(empty)"}`, 400);
+      throw createHttpError("Expected a writable path: " + (requestedPath || "(empty)"), 400);
     }
 
     if (seenProjectPaths.has(normalizedProjectPath)) {
-      throw createHttpError(`Duplicate file write path: ${toAppRelativePath(normalizedProjectPath)}`, 400);
+      throw createHttpError("Duplicate file write path: " + toAppRelativePath(normalizedProjectPath), 400);
     }
 
     seenProjectPaths.add(normalizedProjectPath);
     ensurePublicAppProjectPath(normalizedProjectPath);
     ensureWritableProjectPath(normalizedProjectPath, accessController);
 
+    const operation = ensureValidWriteOperation(getExplicitWriteField(entry, options, "operation"));
+    const insertTarget = normalizeWriteInsertTarget(entry, options, operation, requestedPath);
+
     if (isDirectory) {
       const content = entry.content;
 
       if (content !== undefined && content !== null && content !== "") {
-        throw createHttpError(`Directory writes do not accept content: ${requestedPath}`, 400);
+        throw createHttpError("Directory writes do not accept content: " + requestedPath, 400);
+      }
+
+      if (operation !== "replace") {
+        throw createHttpError("Directory writes do not support " + operation + ": " + requestedPath, 400);
       }
 
       return {
@@ -744,18 +924,25 @@ function normalizeWriteRequests(options = {}) {
       };
     }
 
-    const encoding = ensureValidWriteEncoding(String(entry.encoding || options.encoding || "utf8").toLowerCase());
-    const buffer =
-      encoding === "base64"
-        ? Buffer.from(String(entry.content ?? ""), "base64")
-        : Buffer.from(String(entry.content ?? ""), "utf8");
+    const encoding = ensureValidWriteEncoding(
+      String(getExplicitWriteField(entry, options, "encoding") || "utf8").toLowerCase()
+    );
+    const absolutePath = createAbsolutePath(
+      String(options.projectRoot || ""),
+      normalizedProjectPath,
+      options.runtimeParams
+    );
+    const buffer = buildWriteBuffer({
+      absolutePath,
+      content: getExplicitWriteField(entry, options, "content"),
+      encoding,
+      insertTarget,
+      operation,
+      requestedPath
+    });
 
     return {
-      absolutePath: createAbsolutePath(
-        String(options.projectRoot || ""),
-        normalizedProjectPath,
-        options.runtimeParams
-      ),
+      absolutePath,
       buffer,
       encoding,
       isDirectory: false,

@@ -154,7 +154,6 @@ export async function buildAdminPromptContext(systemPrompt = "", options = {}) {
     ].filter(Boolean);
 
     return {
-      historySkillMessages: [],
       loadedSkillsSection: skillPromptContext.loadedSkillsSection,
       skillsSection: "",
       systemPrompt: sections.join("\n\n"),
@@ -179,9 +178,6 @@ export async function buildAdminPromptContext(systemPrompt = "", options = {}) {
   ].filter(Boolean);
 
   return {
-    historySkillMessages: Array.isArray(skillPromptContext.autoLoadedHistoryMessages)
-      ? skillPromptContext.autoLoadedHistoryMessages
-      : [],
     autoLoadedSkillsSection: skillPromptContext.autoLoadedSkillsSection,
     loadedSkillsSection: skillPromptContext.loadedSkillsSection,
     skillsSection: skillPromptContext.catalogSection,

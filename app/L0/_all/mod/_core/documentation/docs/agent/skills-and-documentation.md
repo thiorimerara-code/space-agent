@@ -16,8 +16,7 @@ This doc covers the shared browser-side skill-loading contract and the documenta
 
 Onscreen skills are discovered from readable module trees:
 
-- top-level catalog pattern: `mod/*/*/ext/skills/*/SKILL.md`
-- full skill tree pattern: `mod/*/*/ext/skills/**/SKILL.md`
+- top-level discovery pattern: `mod/*/*/ext/skills/*/SKILL.md`
 
 Important rules:
 
@@ -25,8 +24,9 @@ Important rules:
 - nested skills are not listed by default
 - both catalog visibility and explicit skill loads evaluate the current document's live `<x-skill-context>` tags
 - `metadata.when` may be `true` or a `{ tags: [...] }` condition, and `metadata.when.tags` requires all listed tags before the skill becomes catalog-loadable
-- any readable skill at any depth may still be auto-loaded with `metadata.loaded: true` or `metadata.loaded.tags`
-- `metadata.placement` chooses where that auto-loaded or manually loaded skill content lands: `system`, `transient`, or `history`, except that auto-loaded skills may not resolve to `history` and therefore fall back to `system` unless they explicitly set `transient`
+- only top-level skills may auto-load through prompt discovery; nested skills remain explicit-load-only even when they define `metadata.loaded`
+- `metadata.placement` chooses where that auto-loaded or manually loaded skill content lands: `system`, `transient`, or `history`, except that auto-loaded skills may land only in `system` or `transient` and therefore fall back to `system` unless they explicitly set `transient`
+- when a skill should auto-load or move, update its `ext/skills/.../SKILL.md` metadata or module ownership rather than hardcoding that id into a prompt builder that already uses shared discovery
 - skill ids are relative to `ext/skills/` without the trailing `/SKILL.md`
 
 Current first-party skill-context examples:
@@ -49,7 +49,7 @@ On-demand loading uses:
 await space.skills.load("skill/path")
 ```
 
-Loaded skills follow the effective placement: ordinary `history` placement is inserted into execution output and then becomes part of history, while `system` and `transient` placement register runtime prompt context and return short load-result text instead of dumping the full body into history. Auto-loaded skills may not resolve to `history`, so missing or invalid placement and explicit `history` all behave as `system` unless the skill explicitly sets `transient`.
+Loaded skills follow the effective placement: ordinary `history` placement is inserted into execution output and then becomes part of history, while `system` and `transient` placement register runtime prompt context and return short load-result text instead of dumping the full body into history. Auto-loaded skills are top-level only and may not resolve to `history`, so missing or invalid placement and explicit `history` all behave as `system` unless the skill explicitly sets `transient`.
 
 Visibility rules:
 
@@ -69,6 +69,7 @@ Conflict rules:
 Current repo-owned shared top-level skills include:
 
 - `development`
+- `memory`
 - `file-download`
 - `pdf-report`
 - `spaces`
@@ -78,7 +79,7 @@ Current repo-owned shared top-level skills include:
 
 Additional group-scoped skills may exist for narrower audiences.
 
-Some of those first-party ids are still gated by live skill-context tags. For example, the shared `file-download` and `user-management` skills require `onscreen`, while `spaces` requires `route:spaces`. The shared `development` skill is the main frontend-development router and is intentionally not tag-gated, so it remains visible and auto-included as the stable index for its nested development skills.
+Some of those first-party ids are still gated by live skill-context tags. For example, the shared `file-download` and `user-management` skills require `onscreen`, while `spaces` requires `route:spaces`. The shared `development` skill is the main frontend-development router and is intentionally not tag-gated, so it remains visible and auto-included as the stable index for its nested development skills. The first-party `memory` skill is also top-level and auto-loaded, and it keeps the prompt-include-backed `~/memory/` convention in model context without needing any special-case prompt-builder code.
 
 The first-party `development` tree is intentionally split into narrower nested skills. The top-level `development` skill is the always-included router for that tree: it should stay concise, but it must keep one visible subsection per nested development skill so agents can choose the right follow-up skill quickly.
 

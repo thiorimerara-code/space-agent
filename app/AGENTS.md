@@ -32,6 +32,7 @@ Current module-local docs in the app tree:
 - `app/L0/_all/mod/_core/framework/AGENTS.md`
 - `app/L0/_all/mod/_core/panels/AGENTS.md`
 - `app/L0/_all/mod/_core/login_hooks/AGENTS.md`
+- `app/L0/_all/mod/_core/memory/AGENTS.md`
 - `app/L0/_all/mod/_core/promptinclude/AGENTS.md`
 - `app/L0/_all/mod/_core/router/AGENTS.md`
 - `app/L0/_all/mod/_core/skillset/AGENTS.md`
@@ -121,6 +122,7 @@ Current major first-party modules under `app/L0/_all/mod/_core/`:
 - `user_crypto/`: headless per-user encryption helper that restores session-scoped unlock state from login bootstrap and exposes `space.utils.userCrypto` for small encrypted user secrets, while short-circuiting to plaintext pass-through in `SINGLE_USER_APP=true`
 - `file_explorer/`: reusable app-file browser component, routed Files page, dashboard panel manifest, and routed header-menu item
 - `documentation/`: supplemental agent-facing documentation docs, the focused-read documentation helper, and the documentation skill that carries the top-level docs map
+- `memory/`: headless agent-memory policy module that auto-loads a top-level skill teaching prompt-include-backed user memory under `~/memory/behavior.system.include.md`, `~/memory/memories.transient.include.md`, and other `~/memory/*.transient.include.md` files
 - `panels/`: headless panel-manifest discovery plus the dashboard-injected Panels section, backed by permission-aware `ext/panels/*.yaml` metadata discovered through the app-file APIs and batch-read through the shared frontend file runtime
 - `promptinclude/`: headless promptinclude discovery and onscreen-agent prompt injection for readable `*.system.include.md` and `*.transient.include.md` app files
 - `onscreen_agent/`: floating routed overlay agent and the first-party user-facing chat runtime
@@ -148,7 +150,9 @@ Current major first-party modules under `app/L0/_all/mod/_core/`:
 - browser-facing code and assets should normally be delivered through `/mod/...`
 - group-scoped onscreen skill packs may live under readable layer roots such as `L0/_admin/mod/.../ext/skills/`; visibility follows the same readable-root permission model as app-file discovery, and each skill file is named `SKILL.md`
 - when a skill needs reusable browser logic, keep that logic in a small module-local JS file and import it from the skill via a stable `/mod/<author>/<repo>/...` path instead of pasting long scripts into `SKILL.md`
-- skill files may use `metadata.when` as either `true` or a `{ tags: [...] }` condition to require live page-owned skill-context tags before they become catalog-loadable, may use `metadata.loaded` as either `true` or another `{ tags: [...] }` condition to auto-inject their body into prompt context after the catalog, and may use `metadata.placement` to route that auto-included or explicitly loaded skill body into the system prompt, transient block, or standard conversation history; ordinary skills still default missing or invalid placement to `history`, but auto-loaded skills may not resolve to history and therefore fall back to `system` unless they explicitly set `transient`
+- skill files may use `metadata.when` as either `true` or a `{ tags: [...] }` condition to require live page-owned skill-context tags before they become catalog-loadable, may use `metadata.loaded` as either `true` or another `{ tags: [...] }` condition to auto-inject their body into prompt context after the catalog, and may use `metadata.placement` to route that auto-included or explicitly loaded skill body into the system prompt, transient block, or standard conversation history; auto-loaded discovery is top-level only at `ext/skills/*/SKILL.md`, while nested skill ids remain loadable only through explicit routing skills or direct `space.skills.load(...)`; ordinary skills still default missing or invalid placement to `history`, but auto-loaded skills may land only in `system` or `transient`, so missing or invalid placement and explicit `history` all fall back to `system` unless they explicitly set `transient`
+- when a skill belongs in prompt context, add or update its `ext/skills/.../SKILL.md` metadata; do not hardcode individual skill ids into prompt-builder JS when the shared discovery contract already covers the behavior
+- the first-party `_core/memory` skill is auto-loaded into agent system prompts and standardizes persistent user memory under `~/memory/behavior.system.include.md`, `~/memory/memories.transient.include.md`, and optional extra `~/memory/*.transient.include.md` files; those files still flow through `_core/promptinclude` rather than a separate storage system
 - when a stable frontend contract or workflow changes, update the relevant narrative docs under `app/L0/_all/mod/_core/documentation/docs/` alongside the owning `AGENTS.md` files
 - page shells may clamp module and extension resolution with `meta[name="space-max-layer"]`; the current admin shell sets `0`
 - page shells may also receive injected `meta[name="space-config"]` tags for runtime parameters marked `frontend_exposed`

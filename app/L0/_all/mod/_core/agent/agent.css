@@ -54,6 +54,35 @@
   line-height: 1.65;
 }
 
+.agent-page-eyebrow {
+  margin: 0;
+  color: #8fc8ff;
+}
+
+.agent-page-highlights {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.agent-page-highlight {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(148, 188, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(10, 20, 34, 0.36);
+}
+
+.agent-page-highlight h3 {
+  font-size: 0.94rem;
+}
+
+.agent-page-highlight p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.58;
+}
+
 .agent-page-avatar-stage {
   position: relative;
   display: grid;

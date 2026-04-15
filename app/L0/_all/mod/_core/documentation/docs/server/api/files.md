@@ -71,6 +71,16 @@ These helpers accept single-path forms and composed batch forms where appropriat
 
 The current frontend `fileRead(...)` wrapper also coalesces same-tick reads into one backend `file_read` request when possible, then re-slices the results back to each caller. If that combined read fails, it retries the queued entries individually so shorthand paths like `~/...` and optional missing-file callers still behave like standalone reads.
 
+`fileWrite(...)` still accepts the simple replacement form `fileWrite(path, content, encoding?)`, but object-form writes now also support incremental mutations:
+
+- `{ path, content, operation: "append" }`
+- `{ path, content, operation: "prepend" }`
+- `{ path, content, operation: "insert", line: 1 }`
+- `{ path, content, operation: "insert", before: "## Notes" }`
+- `{ path, content, operation: "insert", after: "## Notes" }`
+
+`operation` defaults to `replace`. Insert writes accept exactly one anchor through `line`, `before`, or `after`. `line` is a 1-based insertion point, where `1` inserts at the top of the file and the next insertion point after the last line appends at the end. `before` and `after` use the first literal match in the current file. Insert writes require `utf8`; append, prepend, and replace keep the normal `utf8` or `base64` encoding support. Directory writes still use the trailing-slash path form and remain replace-only path creation. Batch writes may set `operation`, `line`, `before`, or `after` per entry, or once at the top level as defaults for every entry in the batch.
+
 `fileList(...)` also accepts an options object. Use `access: "write"` or `writableOnly: true` when a browser surface needs server-confirmed writable paths. Use `gitRepositories: true` with writable access to list local-history owner roots without exposing `.git` metadata.
 
 ## Batch Semantics

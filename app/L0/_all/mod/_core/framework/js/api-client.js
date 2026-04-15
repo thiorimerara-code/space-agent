@@ -155,11 +155,26 @@
  */
 
 /**
- * @typedef {{ path: string, content?: string, encoding?: string }} FileWriteInput
+ * @typedef {{
+ *   after?: string,
+ *   before?: string,
+ *   content?: string,
+ *   encoding?: string,
+ *   line?: number,
+ *   operation?: "replace" | "append" | "prepend" | "insert",
+ *   path: string
+ * }} FileWriteInput
  */
 
 /**
- * @typedef {{ files: FileWriteInput[], encoding?: string }} FileWriteBatchOptions
+ * @typedef {{
+ *   after?: string,
+ *   before?: string,
+ *   encoding?: string,
+ *   files: FileWriteInput[],
+ *   line?: number,
+ *   operation?: "replace" | "append" | "prepend" | "insert"
+ * }} FileWriteBatchOptions
  */
 
 /**
@@ -390,8 +405,12 @@ function createFileWriteRequest(pathOrFiles, content, encoding) {
     return {
       method: "POST",
       body: {
+        after: pathOrFiles.after,
+        before: pathOrFiles.before,
         encoding: pathOrFiles.encoding ?? encoding,
-        files: pathOrFiles.files
+        files: pathOrFiles.files,
+        line: pathOrFiles.line,
+        operation: pathOrFiles.operation
       }
     };
   }
@@ -400,8 +419,12 @@ function createFileWriteRequest(pathOrFiles, content, encoding) {
     return {
       method: "POST",
       body: {
+        after: pathOrFiles.after,
+        before: pathOrFiles.before,
         content: pathOrFiles.content,
         encoding: pathOrFiles.encoding ?? encoding,
+        line: pathOrFiles.line,
+        operation: pathOrFiles.operation,
         path: pathOrFiles.path
       }
     };
@@ -990,6 +1013,9 @@ export function createApiClient(options = {}) {
    * `fileWrite()` accepts app-rooted paths such as `L2/alice/note.txt` and the
    * `~` or `~/...` shorthand for the current user's `L2/<username>/...` path.
    * Paths that end with `/` create directories instead of writing files.
+   * Object-form writes also support `operation: "append"`, `"prepend"`, or
+   * `"insert"`; insert writes accept exactly one anchor through `line`, `before`,
+   * or `after`.
    * It also accepts composed batch input through a `files` array.
    *
    * @param {string | FileWriteInput[] | FileWriteBatchOptions | FileWriteInput} pathOrFiles

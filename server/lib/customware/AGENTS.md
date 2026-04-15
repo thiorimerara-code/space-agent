@@ -101,6 +101,7 @@ Important rules:
 Rules:
 
 - batch file operations must validate all targets before mutation begins
+- `file_write` defaults to replacement but also supports `append`, `prepend`, and `insert`; insert accepts exactly one anchor through `line`, `before`, or `after`, uses the first literal pattern match for `before` or `after`, treats `line` as a 1-based insertion point, and requires `utf8` encoding, while directory writes remain replace-only path creation
 - single-path app-file deletes must continue to work when request plumbing passes `paths: undefined`; only an explicit non-array `paths` value should be rejected as malformed batch input
 - keep permission, duplication, overlap, path-normalization, and logical-to-disk resolution logic centralized here
 - frontend callers should derive writable roots from the canonical permission rules and the `user_self_info` identity fields instead of depending on a serialized scope payload

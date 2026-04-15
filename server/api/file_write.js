@@ -23,9 +23,13 @@ export async function post(context) {
   try {
     return await runTrackedMutation(context, async () => {
       const options = {
+        after: payload.after,
+        before: payload.before,
         content: payload.content,
         encoding: String(payload.encoding || "utf8"),
+        line: payload.line,
         maxLayer,
+        operation: payload.operation,
         path: String(payload.path || context.params.path || ""),
         projectRoot: context.projectRoot,
         runtimeParams: context.runtimeParams,

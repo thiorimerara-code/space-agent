@@ -1,7 +1,6 @@
 import * as sharedSkills from "/mod/_core/skillset/skills.js";
 
 export const ONSCREEN_TOP_LEVEL_SKILL_FILE_PATTERN = sharedSkills.TOP_LEVEL_SKILL_FILE_PATTERN;
-export const ONSCREEN_ALL_SKILL_FILE_PATTERN = sharedSkills.ALL_SKILL_FILE_PATTERN;
 export const ONSCREEN_SKILL_LOAD_HOOK_KEY = "__spaceOnscreenAgentOnSkillLoad";
 
 const listDiscoveredSkillFiles = globalThis.space.extend(
@@ -43,29 +42,15 @@ export const buildOnscreenSkillsPromptSection = globalThis.space.extend(
 export const buildOnscreenAutoLoadedSkillsPromptSection = globalThis.space.extend(
   import.meta,
   async function buildOnscreenAutoLoadedSkillsPromptSection() {
-    const index = await loadOnscreenSkillIndex({
-      pattern: ONSCREEN_ALL_SKILL_FILE_PATTERN
-    });
+    const index = await loadOnscreenSkillIndex();
     return sharedSkills.buildAutoLoadedSkillsPromptSection(index);
-  }
-);
-
-export const buildOnscreenAutoLoadedSkillHistoryMessages = globalThis.space.extend(
-  import.meta,
-  async function buildOnscreenAutoLoadedSkillHistoryMessages() {
-    const index = await loadOnscreenSkillIndex({
-      pattern: ONSCREEN_ALL_SKILL_FILE_PATTERN
-    });
-    return sharedSkills.buildAutoLoadedSkillsHistoryMessages(index);
   }
 );
 
 export const buildOnscreenAutoLoadedSkillTransientSections = globalThis.space.extend(
   import.meta,
   async function buildOnscreenAutoLoadedSkillTransientSections() {
-    const index = await loadOnscreenSkillIndex({
-      pattern: ONSCREEN_ALL_SKILL_FILE_PATTERN
-    });
+    const index = await loadOnscreenSkillIndex();
     return sharedSkills.buildAutoLoadedSkillsTransientSections(index, {
       headingPrefix: "Skill",
       keyPrefix: "skill:auto",
@@ -102,9 +87,7 @@ export const buildOnscreenSkillPromptContext = globalThis.space.extend(
     const includeRuntimeLoaded = options.includeRuntimeLoaded !== false;
     const catalogIndex = includeCatalog ? await loadOnscreenSkillIndex() : null;
     const autoLoadedIndex = includeAutoLoaded
-      ? await loadOnscreenSkillIndex({
-          pattern: ONSCREEN_ALL_SKILL_FILE_PATTERN
-        })
+      ? await loadOnscreenSkillIndex()
       : null;
 
     return {
@@ -113,9 +96,6 @@ export const buildOnscreenSkillPromptContext = globalThis.space.extend(
             loadCommand: 'await space.skills.load("id")'
           })
         : "",
-      autoLoadedHistoryMessages: includeAutoLoaded
-        ? sharedSkills.buildAutoLoadedSkillsHistoryMessages(autoLoadedIndex)
-        : [],
       autoLoadedSkillsSection: includeAutoLoaded
         ? sharedSkills.buildAutoLoadedSkillsPromptSection(autoLoadedIndex)
         : "",

@@ -68,6 +68,67 @@ The five core documentation files remain the project's primary instruction set:
 - `/commands/AGENTS.md`
 - `/packaging/AGENTS.md`
 
+## AGENTS File Index
+
+This root file must keep an exhaustive index of every other repo `AGENTS.md` path so the full contract map is visible without extra filesystem discovery. Update this index whenever an `AGENTS.md` file is added, removed, moved, or renamed.
+
+App docs:
+- `/app/AGENTS.md`
+- `/app/L0/_admin/mod/_core/overlay_agent/AGENTS.md`
+- `/app/L0/_all/mod/_core/admin/AGENTS.md`
+- `/app/L0/_all/mod/_core/admin/views/agent/AGENTS.md`
+- `/app/L0/_all/mod/_core/admin/views/files/AGENTS.md`
+- `/app/L0/_all/mod/_core/admin/views/modules/AGENTS.md`
+- `/app/L0/_all/mod/_core/admin/views/time_travel/AGENTS.md`
+- `/app/L0/_all/mod/_core/agent/AGENTS.md`
+- `/app/L0/_all/mod/_core/dashboard/AGENTS.md`
+- `/app/L0/_all/mod/_core/dashboard_welcome/AGENTS.md`
+- `/app/L0/_all/mod/_core/documentation/AGENTS.md`
+- `/app/L0/_all/mod/_core/file_explorer/AGENTS.md`
+- `/app/L0/_all/mod/_core/framework/AGENTS.md`
+- `/app/L0/_all/mod/_core/huggingface/AGENTS.md`
+- `/app/L0/_all/mod/_core/login_hooks/AGENTS.md`
+- `/app/L0/_all/mod/_core/memory/AGENTS.md`
+- `/app/L0/_all/mod/_core/onscreen_agent/AGENTS.md`
+- `/app/L0/_all/mod/_core/onscreen_agent/prompts/AGENTS.md`
+- `/app/L0/_all/mod/_core/onscreen_menu/AGENTS.md`
+- `/app/L0/_all/mod/_core/open_router/AGENTS.md`
+- `/app/L0/_all/mod/_core/panels/AGENTS.md`
+- `/app/L0/_all/mod/_core/promptinclude/AGENTS.md`
+- `/app/L0/_all/mod/_core/router/AGENTS.md`
+- `/app/L0/_all/mod/_core/skillset/AGENTS.md`
+- `/app/L0/_all/mod/_core/skillset/ext/skills/development/AGENTS.md`
+- `/app/L0/_all/mod/_core/spaces/AGENTS.md`
+- `/app/L0/_all/mod/_core/time_travel/AGENTS.md`
+- `/app/L0/_all/mod/_core/user/AGENTS.md`
+- `/app/L0/_all/mod/_core/user_crypto/AGENTS.md`
+- `/app/L0/_all/mod/_core/visual/AGENTS.md`
+- `/app/L0/_all/mod/_core/webllm/AGENTS.md`
+
+Commands docs:
+- `/commands/AGENTS.md`
+- `/commands/lib/supervisor/AGENTS.md`
+
+Packaging docs:
+- `/packaging/AGENTS.md`
+
+Server docs:
+- `/server/AGENTS.md`
+- `/server/api/AGENTS.md`
+- `/server/jobs/AGENTS.md`
+- `/server/lib/auth/AGENTS.md`
+- `/server/lib/customware/AGENTS.md`
+- `/server/lib/file_watch/AGENTS.md`
+- `/server/lib/git/AGENTS.md`
+- `/server/lib/tmp/AGENTS.md`
+- `/server/pages/AGENTS.md`
+- `/server/router/AGENTS.md`
+- `/server/runtime/AGENTS.md`
+
+Test docs:
+- `/tests/AGENTS.md`
+- `/tests/agent_llm_performance/AGENTS.md`
+
 ## Programming Guide
 
 These rules apply across the codebase:
@@ -95,6 +156,9 @@ These rules apply across the codebase:
 - backend ownership is reserved for security-sensitive enforcement, integrity boundaries, cross-user effects, or runtime-stability concerns that a malicious or buggy frontend could bypass
 - prefer explicit, small contracts between browser and server
 - prefer maintainable filesystem structure over clever routing shortcuts
+- skills are metadata-driven: when a frontend skill should exist, be gated, or auto-load, define that in its `mod/.../ext/skills/.../SKILL.md` file through normal discovery plus `metadata.when`, `metadata.loaded`, and `metadata.placement`
+- do not hardcode specific skill ids into prompt builders or other runtime JS when the shared `ext/skills` discovery contract already covers the behavior
+- only add a new runtime-owned skill seam when the existing metadata-driven skill system cannot express the requirement, and document that reason in the owning `AGENTS.md`
 - do not create new scratch, temporary, or throwaway directories under the repo as tracked content, especially hidden paths such as `.tmp/`; local verification artifacts must stay outside the published repo or in ignored local paths unless the user explicitly asks for a checked-in fixture
 - do not check generated binaries, staged release outputs, or other ephemeral build artifacts into ad hoc repo locations; if a durable fixture is truly required, keep it small, intentional, and in an owned non-hidden test or documentation path
 

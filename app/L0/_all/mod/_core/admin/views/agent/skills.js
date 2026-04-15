@@ -1,7 +1,6 @@
 import * as sharedSkills from "/mod/_core/skillset/skills.js";
 
 const ADMIN_TOP_LEVEL_SKILL_FILE_PATTERN = sharedSkills.TOP_LEVEL_SKILL_FILE_PATTERN;
-const ADMIN_ALL_SKILL_FILE_PATTERN = sharedSkills.ALL_SKILL_FILE_PATTERN;
 const ADMIN_MAX_LAYER = 0;
 
 export async function loadAdminSkillCatalog() {
@@ -21,7 +20,7 @@ export async function buildAdminSkillsPromptSection() {
 export async function buildAdminAutoLoadedSkillsPromptSection() {
   const index = await sharedSkills.loadSkillIndex({
     maxLayer: ADMIN_MAX_LAYER,
-    pattern: ADMIN_ALL_SKILL_FILE_PATTERN
+    pattern: ADMIN_TOP_LEVEL_SKILL_FILE_PATTERN
   });
   return sharedSkills.buildAutoLoadedSkillsPromptSection(index);
 }
@@ -39,7 +38,7 @@ export async function buildAdminSkillPromptContext(options = {}) {
   const autoLoadedIndex = includeAutoLoaded
     ? await sharedSkills.loadSkillIndex({
         maxLayer: ADMIN_MAX_LAYER,
-        pattern: ADMIN_ALL_SKILL_FILE_PATTERN
+        pattern: ADMIN_TOP_LEVEL_SKILL_FILE_PATTERN
       })
     : null;
 
@@ -49,9 +48,6 @@ export async function buildAdminSkillPromptContext(options = {}) {
           loadCommand: 'await space.admin.loadSkill("id")'
         })
       : "",
-    autoLoadedHistoryMessages: includeAutoLoaded
-      ? sharedSkills.buildAutoLoadedSkillsHistoryMessages(autoLoadedIndex)
-      : [],
     autoLoadedSkillsSection: includeAutoLoaded
       ? sharedSkills.buildAutoLoadedSkillsPromptSection(autoLoadedIndex)
       : "",

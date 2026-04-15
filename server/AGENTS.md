@@ -216,6 +216,8 @@ Current endpoint families:
 - modules: `module_list`, `module_info`, `module_install`, `module_remove`
 - runtime and identity: `extensions_load`, `debug_path_index`, `password_generate`, `password_change`, `user_self_info`
 
+`file_write` still defaults to whole-file replacement, but it now also supports append, prepend, and text-insert mutations through the shared file-access layer, so browser callers can update ordinary text files incrementally without fetching and rewriting the full file every time.
+
 `user_self_info` is the canonical authenticated identity snapshot for browser clients. It also carries the current backend `sessionId` plus `userCrypto` readiness fields so browser modules can restore session-scoped decryption state before using encrypted user settings.
 
 Detailed endpoint behavior now lives in `server/api/AGENTS.md`.

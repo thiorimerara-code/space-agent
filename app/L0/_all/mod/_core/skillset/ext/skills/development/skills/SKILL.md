@@ -26,7 +26,7 @@ Examples:
 - Both the catalog and explicit `space.skills.load(...)` calls evaluate the current document's `<x-skill-context>` tags before a skill is eligible.
 - `metadata.when` may be `true` or a `{ tags: [...] }` condition; `metadata.when.tags` requires all listed tags before the skill becomes catalog-loadable.
 - `metadata.placement` accepts `system`, `transient`, or `history`; ordinary skills default missing or invalid placement to `history`, but auto-loaded skills may not resolve to `history`, so missing or invalid placement and explicit `history` all fall back to `system` unless the skill explicitly sets `transient`.
-- Any readable skill at any depth can still be auto-loaded when its frontmatter sets `metadata.loaded: true` or another `metadata.loaded.tags` condition that currently passes.
+- Only top-level `ext/skills/*/SKILL.md` skills can auto-load through prompt discovery. Nested skills stay explicit-load-only routing targets even if they define `metadata.loaded`.
 - Auto-loaded skills appear after the catalog in the `auto loaded` prompt block when their effective placement is `system`, or in the transient channel when they explicitly set `metadata.placement: transient`.
 - Routing skills should tell the agent which deeper skill ids to load next.
 - `space.skills.load("<path>")` loads the full skill file on demand and applies the same placement rule.

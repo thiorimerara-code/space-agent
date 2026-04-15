@@ -135,6 +135,34 @@ function readUserFile(projectRoot, username, filePath) {
 
 {
   const projectRoot = createProjectRoot();
+  const runtimeParams = createStaticRuntimeParams({
+    USER_FOLDER_SIZE_LIMIT_BYTES: 10
+  });
+
+  writeAppFile({
+    content: "12345",
+    path: "~/notes.txt",
+    projectRoot,
+    runtimeParams,
+    username: "alice"
+  });
+
+  assertQuotaError(() => {
+    writeAppFile({
+      content: "678901",
+      operation: "append",
+      path: "~/notes.txt",
+      projectRoot,
+      runtimeParams,
+      username: "alice"
+    });
+  });
+
+  assert.equal(readUserFile(projectRoot, "alice", "notes.txt"), "12345");
+}
+
+{
+  const projectRoot = createProjectRoot();
   const unboundedRuntimeParams = createStaticRuntimeParams({
     USER_FOLDER_SIZE_LIMIT_BYTES: 0
   });
